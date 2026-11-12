@@ -27,10 +27,10 @@ La fixture `fixtures/fautes/faute-curseur-invisible.tcl` rejoue le
 
 | # | Verdict | Sévérité |
 |---|---|---|
-| 0–5 | `TOILE_OK` (créations, backings, scanout) | info |
-| 6 | `TOILE_OK` (`update_cursor` : curseur visible) | info |
-| 7 | `TOILE_OK` (`move_cursor` : curseur déjà visible) | info |
-| 8 | `TOILE_MODEL_CONSISTENT` | info |
+| 0–4 | `TOILE_OK` (créations, backings, scanout) | info |
+| 5 | `TOILE_OK` (`update_cursor` : curseur visible) | info |
+| 6 | `TOILE_OK` (`move_cursor` : curseur déjà visible) | info |
+| 7 | `TOILE_MODEL_CONSISTENT` | info |
 
 Code de sortie attendu : **0**.
 
