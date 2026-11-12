@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — codelab</title>
+  <meta name="description" content="The Toile codelab: Giving a QNX VM a display, in four chapters.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="trials.html">Trials</a>
+    <a href="contract.html">Contract</a>
+    <a href="codelab.html" aria-current="page">Codelab</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Codelab</h1>
+  <p class="lede">&ldquo;Giving a QNX VM a display&rdquo; — four chapters, from the problem to a working
+  desktop in a window. Chapters 1&ndash;2 run on any Linux machine; chapters 3&ndash;4 depend on the
+  validated target. Full text in <a href="https://github.com/BaptisteFaisy/toile/tree/main/codelab"><code>codelab/</code></a>.</p>
+
+  <div class="grid">
+    <div class="card"><h3>1 &middot; A display for a QNX VM</h3>
+      <p>Why Screen is unusable in a VM without passthrough, what virtio-gpu is, and the two sides (QEMU
+      host first). Boot a VM with <code>-device virtio-gpu-pci</code> and see nothing appear without the driver.</p>
+      <p><span class="badge pos">runs anywhere</span></p></div>
+    <div class="card"><h3>2 &middot; The portable core</h3>
+      <p><code>make build</code>, write your first fixture in the DSL, read the verdicts, the three output
+      formats, the state hash and the C&harr;Python differential. 100% executable on an ordinary machine.</p>
+      <p><span class="badge pos">runs anywhere</span></p></div>
+    <div class="card"><h3>3 &middot; The guest driver</h3>
+      <p>PCI enumeration, transport reuse from Passerelle, the controlq/cursorq, the <code>/dev/gpu0</code>
+      resource manager, building with <code>qcc</code>, and trial E1 as the check.</p>
+      <p><span class="badge part">target dependent</span></p></div>
+    <div class="card"><h3>4 &middot; Screen and the demo</h3>
+      <p>The Screen display driver interface, one framebuffer and one head, the mkifs image, the QEMU scripts,
+      and the &lt;3&nbsp;min demo for the submission.</p>
+      <p><span class="badge part">target dependent</span></p></div>
+  </div>
+
+  <h2>Run the local part now</h2>
+  <pre><code>git clone https://github.com/BaptisteFaisy/toile.git
+cd toile
+make build
+./build/toile-run run fixtures/boot-graphique.tcl
+python3 -m toile.cli run fixtures/boot-graphique.tcl --format json   # from host/</code></pre>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; <a href="https://github.com/BaptisteFaisy/toile">github.com/BaptisteFaisy/toile</a></div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

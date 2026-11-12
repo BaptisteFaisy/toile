@@ -1,0 +1,43 @@
+name: pages
+
+# Déploiement GitHub Pages du site statique (site/) — en anglais, sans CDN,
+# sans framework. Budget CI : ≤ 5 min (règle user 2026-10-24).
+# Construit seulement quand le site ou ce workflow change, jamais sur les PR
+# de code (filtre paths), pour ne pas gaspiller le runner self-hosted.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Configurer Pages
+        uses: actions/configure-pages@v5
+      - name: Prépare l'artefact (site/)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+      - name: Déployer
+        id: deployment
+        uses: actions/deploy-pages@v4

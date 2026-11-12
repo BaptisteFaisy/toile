@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — architecture</title>
+  <meta name="description" content="Toile architecture: portable C11 core, QNX guest driver, Screen display driver, and the differential Python twin.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="architecture.html" aria-current="page">Architecture</a>
+    <a href="trials.html">Trials</a>
+    <a href="contract.html">Contract</a>
+    <a href="codelab.html">Codelab</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Architecture</h1>
+
+  <figure>
+    <svg width="600" height="240" viewBox="0 0 600 240" role="img"
+         aria-label="Three layers: portable core, guest driver, Screen display driver.">
+      <style>
+        .box { fill: #1b1e23; stroke: #4fc89a; stroke-width: 1.5; }
+        .box.lt { fill: #23272d; stroke: #a0a6ad; }
+        .t { fill: #e8e9eb; font: 13px sans-serif; }
+        .d { fill: #a0a6ad; font: 11px sans-serif; }
+        .a { stroke: #a0a6ad; stroke-width: 1.5; marker-end: url(#arr); fill: none; }
+      </style>
+      <defs>
+        <marker id="arr" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+          <path d="M0,0 L8,4.5 L0,9 z" fill="#a0a6ad"/>
+        </marker>
+      </defs>
+      <rect class="box lt" x="20" y="20" width="180" height="70" rx="6"/>
+      <text class="t" x="34" y="44">Screen display driver</text>
+      <text class="d" x="34" y="62">one framebuffer, one head</text>
+      <rect class="box" x="360" y="20" width="180" height="70" rx="6"/>
+      <text class="t" x="374" y="44">Guest driver</text>
+      <text class="d" x="374" y="62">PCI, controlq/cursorq, /dev/gpu0</text>
+      <rect class="box" x="190" y="150" width="180" height="70" rx="6"/>
+      <text class="t" x="204" y="174">Portable core (C11)</text>
+      <text class="d" x="204" y="192">no clock, no file, no socket</text>
+      <path class="a" d="M200,90 L280,150"/>
+      <path class="a" d="M450,90 L370,150"/>
+    </svg>
+    <figcaption>The portable core in the middle; Screen on the left, the virtio transport on the right.</figcaption>
+  </figure>
+
+  <h2>Three layers</h2>
+  <ul>
+    <li><strong>Portable core</strong> (<code>core/</code>, pure C11): the virtio-gpu 2D command machine —
+    resources, scanouts, backing, flush, transfers — plus the verdict engine and the frozen output
+    formats. It has <strong>no clock, no file, no socket, no QNX API and no dynamic allocation</strong>.</li>
+    <li><strong>Guest driver</strong> (<code>guest/</code>, QNX): PCI enumeration of the virtio-gpu device,
+    transport init (adapted from <em>Passerelle</em>, Apache-2.0), the <code>controlq</code>/<code>cursorq</code>
+    queues, and a resource manager exposing <code>/dev/gpu0</code>.</li>
+    <li><strong>Screen display driver</strong> (<code>guest/display/</code>): the QNX Screen display-driver
+    interface on top of the GPU driver — the piece that makes a real QNX desktop appear.</li>
+  </ul>
+
+  <h2>The processing chain</h2>
+  <p>Every virtio-gpu command flows one way, never back:</p>
+  <pre><code>command  &rarr;  parse  &rarr;  validate  &rarr;  apply to state  &rarr;  host effect  &rarr;  acknowledge</code></pre>
+  <p>An invalid command produces a verdict and is <strong>never applied partially</strong>: the state either
+  changes completely or not at all.</p>
+
+  <h2>Two implementations, one contract</h2>
+  <p>The core exists twice: in C (<code>core/</code>) and as an <strong>independent Python twin</strong>
+  (<code>host/</code>). They share only the frozen contract (<code>CONTRACT.md</code>), never code. The
+  differential test (<code>tests/differential.py</code>) replays every fixture through both and compares the
+  output <strong>byte for byte</strong> — a second independent verification, not a second copy.</p>
+
+  <h2>Proof strategy</h2>
+  <ul>
+    <li><strong>P1 coherence</strong> — after any valid sequence, the model is consistent (invariants checked after every command).</li>
+    <li><strong>P2 rejection</strong> — an invalid command is rejected with a precise verdict, no partial application.</li>
+    <li><strong>P3 determinism</strong> — the same sequence produces the same final state and hash, byte for byte.</li>
+  </ul>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; <a href="https://github.com/BaptisteFaisy/toile">github.com/BaptisteFaisy/toile</a></div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

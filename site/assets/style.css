@@ -1,0 +1,152 @@
+/* Toile — project site. Vanilla CSS, no external fonts, no CDN. */
+:root {
+  --bg: #f7f6f3;
+  --fg: #1c1e21;
+  --muted: #5b6067;
+  --accent: #0b6e4f;
+  --accent-ink: #ffffff;
+  --panel: #ffffff;
+  --border: #d9d6cf;
+  --code-bg: #eef0f2;
+  --ok: #0b6e4f;
+  --warn: #9a6b00;
+  --err: #b3261e;
+  --maxw: 62rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121417;
+    --fg: #e8e9eb;
+    --muted: #a0a6ad;
+    --accent: #4fc89a;
+    --accent-ink: #08211a;
+    --panel: #1b1e23;
+    --border: #2e3339;
+    --code-bg: #23272d;
+    --ok: #6fdcb4;
+    --warn: #f2c14e;
+    --err: #ff8a7a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+a { color: var(--accent); }
+a:hover { text-decoration-thickness: 2px; }
+
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+header.site .wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+header.site .brand { font-weight: 700; font-size: 1.2rem; color: var(--fg); }
+header.site nav a { color: var(--muted); text-decoration: none; margin-right: 1rem; }
+header.site nav a[aria-current="page"],
+header.site nav a:hover { color: var(--accent); }
+
+main { max-width: var(--maxw); margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+h1, h2, h3 { line-height: 1.2; }
+h1 { font-size: 2rem; margin: 0 0 .5rem; }
+h2 { font-size: 1.45rem; margin: 2.2rem 0 .6rem; }
+h3 { font-size: 1.15rem; margin: 1.6rem 0 .4rem; }
+
+.lede { font-size: 1.12rem; color: var(--muted); max-width: 46rem; }
+
+.promise {
+  border-left: 4px solid var(--accent);
+  background: var(--panel);
+  padding: .9rem 1.1rem;
+  margin: 1.5rem 0;
+  border-radius: 0 6px 6px 0;
+}
+.promise p { margin: 0; font-size: 1.08rem; }
+
+figure { margin: 1.5rem 0; text-align: center; }
+figure svg { max-width: 100%; height: auto; }
+figcaption { color: var(--muted); font-size: .9rem; margin-top: .4rem; }
+
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .9rem 1rem;
+  overflow-x: auto;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+  font-size: .88rem;
+}
+code { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: .92em; }
+pre code { font-size: 1em; }
+
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+th, td { border: 1px solid var(--border); padding: .5rem .7rem; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+
+.badge { display: inline-block; padding: .12rem .55rem; border-radius: 999px; font-size: .82rem; border: 1px solid var(--border); }
+.badge.pos { color: var(--ok); border-color: var(--ok); }
+.badge.neg { color: var(--err); border-color: var(--err); }
+.badge.part { color: var(--warn); border-color: var(--warn); }
+.badge.na  { color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin: 1.2rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.1rem; }
+.card h3 { margin-top: 0; }
+
+footer.site {
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .9rem;
+}
+footer.site .wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 1.25rem;
+}
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 40rem) {
+  header.site .wrap { gap: .6rem; }
+  header.site nav a { margin-right: .7rem; }
+  h1 { font-size: 1.55rem; }
+}
+/* code copy button (added by site.js) */
+button.copy {
+  position: absolute;
+  top: .4rem;
+  right: .4rem;
+  font-size: .75rem;
+  padding: .15rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+button.copy:hover { color: var(--accent); border-color: var(--accent); }
+
+/* mobile nav */
+#nav-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); padding: .3rem .6rem; cursor: pointer; }
+@media (max-width: 40rem) {
+  #nav-toggle { display: inline-block; }
+  header.site nav { display: none; }
+  header.site nav.open { display: flex; flex-direction: column; width: 100%; gap: .2rem; }
+}
