@@ -107,7 +107,9 @@ Variantes testables : `TOILE_VARIANT=virtio-vga` (classe VGA), `TOILE_VARIANT=vi
 
 **Déjà vérifié dans un invité QNX 8.0 réel** (`qemu/probe-driver.sh`, exit 0) : le pilote trouve
 le périphérique virtio-gpu, **reçoit** `GET_DISPLAY_INFO`, **fait accepter**
-`RESOURCE_CREATE_2D` + backing + `SET_SCANOUT`, et publie `/dev/gpu0`. Reste ouvert : l'ouverture
+`RESOURCE_CREATE_2D` + backing + `SET_SCANOUT`, et publie `/dev/gpu0`. Preuve visuelle déjà faite : avec `toile-gpu --mire`, la mire peinte **dans l'invité** apparaît
+dans la fenêtre QEMU (capture 1280×800, six barres de couleur — `docs/DEMO-EMULATEUR.md`,
+`docs/preuves/toile-mire-1280x800.png`). Reste ouvert : l'ouverture
 de `/dev/gpu0` par un client plante dans la bibliothèque resmgr de QNX 8.0 (avant tout handler
 Toile) — c'est le dernier obstacle du côté invité, et il est détaillé dans
 [`docs/TRIALS-E1-E6.md`](docs/TRIALS-E1-E6.md).
