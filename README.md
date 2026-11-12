@@ -5,6 +5,11 @@ accompagné du **display driver Screen** qui s'appuie dessus. Projet candidat au
 **QNX Global Hackathon 2026**, catégorie *Low-level Software*, bonus *Best use of
 QNX-specific Technologies*. Licence [MIT](LICENSE).
 
+**Site du projet : <https://baptistefaisy.github.io/toile/>**
+
+[![ci](https://github.com/BaptisteFaisy/toile/actions/workflows/ci.yml/badge.svg)](https://github.com/BaptisteFaisy/toile/actions/workflows/ci.yml)
+[![ci-budget](https://github.com/BaptisteFaisy/toile/actions/workflows/ci-budget.yml/badge.svg)](https://github.com/BaptisteFaisy/toile/actions/workflows/ci-budget.yml)
+
 ---
 
 ## Le problème

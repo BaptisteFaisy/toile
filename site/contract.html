@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — the frozen contract</title>
+  <meta name="description" content="Toile's frozen contract: commands, verdicts, output formats, state hash and the protected public API.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="trials.html">Trials</a>
+    <a href="contract.html" aria-current="page">Contract</a>
+    <a href="codelab.html">Codelab</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>The frozen contract</h1>
+  <p class="lede"><code>CONTRACT.md</code> is the single frozen source of truth. The C core and the Python
+  twin implement it independently; the public API in section 10 is protected byte-for-byte. Changing it
+  requires a pull request that updates the contract <em>and</em> both implementations together.</p>
+
+  <h2>Commands (S level)</h2>
+  <table>
+    <tr><th>Name</th><th>Type</th><th>Effect</th></tr>
+    <tr><td><code>get_display_info</code></td><td>0x0100</td><td>no mutation</td></tr>
+    <tr><td><code>resource_create_2d</code></td><td>0x0101</td><td>create a resource</td></tr>
+    <tr><td><code>resource_unref</code></td><td>0x0102</td><td>destroy (refused if displayed)</td></tr>
+    <tr><td><code>set_scanout</code></td><td>0x0103</td><td>attach a resource to a head</td></tr>
+    <tr><td><code>resource_flush</code></td><td>0x0104</td><td>host effect &ldquo;display&rdquo;</td></tr>
+    <tr><td><code>transfer_to_host_2d</code></td><td>0x0105</td><td>copy guest &rarr; host</td></tr>
+    <tr><td><code>resource_attach_backing</code></td><td>0x0106</td><td>attach guest pages</td></tr>
+    <tr><td><code>resource_detach_backing</code></td><td>0x0107</td><td>detach pages</td></tr>
+    <tr><td><code>update_cursor</code> / <code>move_cursor</code></td><td>0x0300 / 0x0301</td><td>hardware cursor</td></tr>
+    <tr><td><code>transfer_from_host</code></td><td>0x0206</td><td>read host &rarr; guest</td></tr>
+  </table>
+
+  <h2>Verdicts</h2>
+  <table>
+    <tr><th>Code</th><th>Severity</th></tr>
+    <tr><td><code>TOILE_OK</code> &middot; <code>TOILE_TRANSFER_OK</code> &middot; <code>TOILE_MODEL_CONSISTENT</code></td><td>info</td></tr>
+    <tr><td><code>TOILE_RESOURCE_EXISTS</code> &middot; <code>TOILE_FLUSH_NO_SCANOUT</code></td><td>warning</td></tr>
+    <tr><td><code>TOILE_CMD_INVALID</code> &middot; <code>TOILE_RESOURCE_MISSING</code> &middot; <code>TOILE_BACKING_MISSING</code> &middot; <code>TOILE_SCANOUT_INVALID</code> &middot; <code>TOILE_MODEL_COUNTEREXAMPLE</code></td><td>error</td></tr>
+  </table>
+
+  <h2>Output formats</h2>
+  <p>Three formats, produced identically by C and Python, compared octet for octet:</p>
+  <pre><code>$ ./build/toile-run run fixtures/boot-graphique.tcl --format text
+toile v1 text
+0000 TOILE_OK                   info cmd=0x0101 resource=1
+# state resources=1 scanouts=1 hash=94b99b612398f675 applied=5 ...</code></pre>
+  <p>Plus <code>--format json</code> (one line, frozen key order) and <code>--format md</code> (audit table).
+  The state hash is FNV-1a 64 over a canonical serialization — the same sequence always yields the same
+  hash, byte for byte (determinism).</p>
+
+  <h2>Fixtures</h2>
+  <p>Sequences of reference commands, in a small text DSL (<code>.tcl</code>): a boot-to-desktop sequence,
+  resize, multi-resource, multi-scanout, cursor, and the fault cases that must be rejected with a precise
+  verdict. Wire-level fixtures (<code>fixtures/wire/*.hex</code>) exercise the real little-endian encoding.</p>
+
+  <h2>Protected API</h2>
+  <p>The public API (CONTRACT.md &sect;10) is asserted by the CI guard <code>.github/checks/api-frozen.py</code>:
+  every function signature must be present in the C headers and have a Python twin &mdash; a missing symbol
+  fails the build. Remove a symbol, and the contract complains.</p>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; <a href="https://github.com/BaptisteFaisy/toile">github.com/BaptisteFaisy/toile</a></div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — a display for QNX in a VM</title>
+  <meta name="description" content="Toile is a virtio-gpu 2D driver for QNX 8.0 guest (QEMU VM) plus a Screen display driver: it gives a full QNX desktop in a VM with no GPU passthrough.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html" aria-current="page">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="trials.html">Trials</a>
+    <a href="contract.html">Contract</a>
+    <a href="codelab.html">Codelab</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Toile</h1>
+  <p class="lede">A <strong>virtio-gpu 2D driver for QNX 8.0 as a guest</strong> (QEMU VM),
+  paired with a <strong>Screen display driver</strong>. It paints a full QNX desktop in a
+  VM window — with no hardware GPU passthrough. QNX Global Hackathon 2026, Low-level Software.</p>
+
+  <div class="promise"><p>A QNX developer boots a VM on a laptop and sees a <strong>complete QNX
+  desktop</strong> in a window — no dedicated card, no passthrough, no second machine.</p></div>
+
+  <h2>The problem</h2>
+  <p>A QNX VM boots under QEMU. The kernel comes up, services start&hellip; and there is
+  <strong>no picture</strong> — a serial console only.</p>
+  <p>Screen, QNX&rsquo;s graphics server, needs a display driver. QNX ships <strong>no virtio-gpu
+  virtual device on the hypervisor side, and no Screen display driver for a virtual GPU in a
+  guest</strong>. So in a VM, Screen is unusable <em>without</em> hardware passthrough — which is
+  heavy, hypervisor-specific, non-portable and needs a dedicated card.</p>
+
+  <h2>What Toile does</h2>
+  <div class="grid">
+    <div class="card"><h3>Reuse the transport</h3>
+      <p>The hard part of virtio (modern PCI, MSI-X, virtqueues) already exists in the sibling
+      project <em>Passerelle</em>. Toile adapts it and writes only the virtio-gpu layer on top.</p></div>
+    <div class="card"><h3>Two sides, one risk</h3>
+      <p>Side A (QEMU host) needs only the guest driver and ships first. Side B (QNX Hypervisor
+      host) also needs a host <code>vdev</code> and is conditional on the hypervisor DDK.</p></div>
+    <div class="card"><h3>A modelable protocol</h3>
+      <p>The virtio-gpu 2D command machine is pure C11: it runs from a unit test on a PC, from a
+      Python twin, and later from the guest driver. The driver is just the glue.</p></div>
+  </div>
+
+  <h2>Status</h2>
+  <table>
+    <tr><th>Level</th><th>Scope</th><th>Status</th></tr>
+    <tr><td><strong>S</strong></td><td>Core C11 + Python twin + fixtures, portable and CI-green</td><td><span class="badge pos">delivered &amp; green</span></td></tr>
+    <tr><td><strong>C</strong></td><td>Multi-scanout, cursor, damage tracking, virtio-input</td><td><span class="badge part">in progress</span></td></tr>
+    <tr><td><strong>X</strong></td><td>Host vdev, host 2D accel, documented 3D path</td><td><span class="badge na">conditional</span></td></tr>
+  </table>
+
+  <h2>Quick start (no QNX, no QEMU, no GPU needed)</h2>
+  <pre><code>git clone https://github.com/BaptisteFaisy/toile.git
+cd toile
+make build
+make test          # core + Python twin + differential + guards
+./build/toile-run run fixtures/boot-graphique.tcl</code></pre>
+
+  <h2>More</h2>
+  <ul>
+    <li><a href="architecture.html">Architecture</a> — the three layers and the portability rule</li>
+    <li><a href="trials.html">Trials</a> — E1&ndash;E5, with raw evidence</li>
+    <li><a href="contract.html">Contract</a> — the frozen protocol and API</li>
+    <li><a href="codelab.html">Codelab</a> — &ldquo;Giving a QNX VM a display&rdquo;</li>
+    <li>Repository: <a href="https://github.com/BaptisteFaisy/toile">github.com/BaptisteFaisy/toile</a> (MIT)</li>
+  </ul>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; virtio-gpu 2D for QNX 8.0 guest &middot; QNX Global Hackathon 2026</div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

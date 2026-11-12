@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — trials (E1–E5)</title>
+  <meta name="description" content="The factual status of Toile's validation trials E1 through E5, with raw evidence.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="trials.html" aria-current="page">Trials</a>
+    <a href="contract.html">Contract</a>
+    <a href="codelab.html">Codelab</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Trials</h1>
+  <p class="lede">The forkable questions that decide the project, and what we actually measured.
+  The full file of truth is <a href="https://github.com/BaptisteFaisy/toile/blob/main/docs/TRIALS-E1-E4.md"><code>docs/TRIALS-E1-E4.md</code></a>.</p>
+
+  <table>
+    <tr><th>#</th><th>Question</th><th>Verdict</th></tr>
+    <tr><td><strong>E1</strong></td><td>Does a QNX 8.0 guest enumerate <code>virtio-gpu-pci</code> on its PCI bus?</td><td><span class="badge pos">positive — executed</span></td></tr>
+    <tr><td><strong>E2</strong></td><td>Does Screen accept a third-party display driver, and what is the exact contract?</td><td><span class="badge part">interface identified, integration untested</span></td></tr>
+    <tr><td><strong>E3</strong></td><td>Is the virtio transport reusable as-is for virtio-gpu?</td><td><span class="badge part">partially — reused with a patch</span></td></tr>
+    <tr><td><strong>E4</strong></td><td>Is the hypervisor DDK available under a non-commercial licence?</td><td><span class="badge neg">negative</span></td></tr>
+    <tr><td><strong>E5</strong></td><td>Is a 2D flush fast enough for a usable desktop (&ge; 15&ndash;20 fps at 1080p)?</td><td><span class="badge na">not measured on target</span></td></tr>
+  </table>
+
+  <h2>E1 — the device is enumerated</h2>
+  <p>A minimal QNX 8.0 image (built with <code>mkifs</code>, no disk, serial console) was booted under
+  QEMU 8.2.2 with <code>-device virtio-gpu-pci</code>. <code>pci-tool -v</code> reports the virtio-gpu
+  modern device at <code>B000:D03:F00</code>:</p>
+  <pre><code>B000:D03:F00 @ idx 5
+	vid/did: 1af4/1050
+	class/subclass/reg: 03/80/00</code></pre>
+  <p><code>1af4</code> is the virtio vendor, <code>1050</code> the virtio-gpu device id in modern (transitional
+  off) mode, class <code>03/80/00</code> = display controller. The <code>virtio-vga</code> variant enumerates
+  too (class <code>03/00/00</code>). Reproducible via <code>qemu/probe-e1.sh</code>.</p>
+
+  <h2>E2, E3, E4 — read the docs</h2>
+  <ul>
+    <li><strong>E2</strong>: the Screen display driver interface is in the SDP headers; aligning the guest
+    driver to the real API is the next step, after which the integration still has to be proven on a VM.</li>
+    <li><strong>E3</strong>: the Passerelle transport core is reusable; a ~100-line patch covers QNX 8.0 API
+    differences. The transport is adapted, not rewritten.</li>
+    <li><strong>E4</strong>: the hypervisor DDK is absent from the installed SDP and not covered by the
+    installed licence — the host-side vdev (side B) stays conditional.</li>
+  </ul>
+
+  <p>What is <strong>not yet</strong> measured on target: the real guest&rarr;host flush throughput (E5), the
+  end-to-end vertical sync, and a full Screen desktop in the guest. These are stated plainly in the docs,
+  not papered over.</p>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; <a href="https://github.com/BaptisteFaisy/toile">github.com/BaptisteFaisy/toile</a></div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>
