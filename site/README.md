@@ -26,6 +26,7 @@ python3 -m http.server 8000 --directory site
 |---|---|
 | `index.html` | accroche, problème, promesse, trois idées, statut, démarrage rapide |
 | `architecture.html` | 3 couches, chaîne de traitement, double implémentation, preuve P1/P2/P3 |
+| `emulator.html` | la boucle QEMU (périphérique hôte + pilote invité) et la commande de démo unique |
 | `trials.html` | E1–E5 avec les verdicts exacts et les extraits de preuve |
 | `contract.html` | contrat gelé : commandes, verdicts, formats, hash, API protégée |
 | `codelab.html` | les 4 chapitres « Giving a QNX VM a display » |

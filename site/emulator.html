@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — in the emulator (QEMU)</title>
+  <meta name="description" content="How Toile links the QNX guest driver to the QEMU emulator, and the proofs (numerical readback and screen capture).">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="emulator.html" aria-current="page">Emulator</a>
+    <a href="trials.html">Trials</a>
+    <a href="contract.html">Contract</a>
+    <a href="codelab.html">Codelab</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>In the emulator</h1>
+  <p class="lede">Toile is the <strong>guest half</strong> of the loop. The <strong>host half</strong> is
+  already there: QEMU ships the standard <code>virtio-gpu-pci</code> device. Linked together, a QNX guest
+  paints through Toile, and the emulator shows it.</p>
+
+  <h2>The loop</h2>
+  <pre><code>QNX guest (Toile driver)                 QEMU host (virtio-gpu device)
+  PCI enumerate 1af4/1050  ───────────────▶  device present
+  GET_DISPLAY_INFO ───────────────────────▶  scanout 0, 1280×800 enabled
+  RESOURCE_CREATE_2D + backing ───────────▶  resource registered
+  SET_SCANOUT ────────────────────────────▶  surface selected for display
+  paint + flush ──────────────────────────▶  emulator window shows it
+  TRANSFER_FROM_HOST (0x0206) ◀───────────  read back (numerical proof)</code></pre>
+
+  <h2>One command</h2>
+  <pre><code>./qemu/run-demo.sh</code></pre>
+  <p><code>run-demo.sh</code> builds the guest image, boots it under QEMU, paints the test pattern from
+  inside the guest, captures the screen, and reports the verdict. Options via environment variables
+  (<code>TOILE_SDP</code>, <code>TOILE_WORK</code>, <code>TOILE_VARIANT</code>, <code>TOILE_DISPLAY</code>,
+  <code>TOILE_TIMEOUT</code>).</p>
+
+  <h2>What QEMU provides</h2>
+  <ul>
+    <li><code>-device virtio-gpu-pci</code> — the modern (transitional off) device, class <code>03/80/00</code>.</li>
+    <li><code>-device virtio-vga</code> — the VGA-compatible variant, class <code>03/00/00</code>.</li>
+    <li><code>-device virtio-gpu-device</code> — the MMIO variant (no PCI).</li>
+    <li>Only the device exists host-side; the <em>driver</em> for the guest is what Toile contributes.</li>
+  </ul>
+
+  <h2>Proofs</h2>
+  <ul>
+    <li><strong>Numerical</strong>: the guest paints a known pattern and reads it back through the device
+    (<code>TRANSFER_FROM_HOST</code>, 0x0206); a matching checksum means the pixels actually travelled
+    guest &rarr; emulator &rarr; guest.</li>
+    <li><strong>Visual</strong>: a screen capture of the QEMU display, showing the pattern.</li>
+  </ul>
+  <!-- PREUVE-VISUELLE : capture de l'affichage QEMU, insérée une fois la preuve exécutée -->
+
+  <p>The current state of the emulator loop is in
+  <a href="https://github.com/Tradoooo/toile/blob/main/docs/TRIALS-E1-E6.md"><code>docs/TRIALS-E1-E6.md</code></a>.</p>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; <a href="https://github.com/Tradoooo/toile">github.com/Tradoooo/toile</a></div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>
