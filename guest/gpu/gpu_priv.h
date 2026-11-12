@@ -57,6 +57,9 @@ typedef struct gpu_ctx {
 } gpu_ctx;
 
 /* --- gpu_pci.c: enumeration + device bring-up ------------------------- */
+/* Phase-1 console evidence: find the virtio-gpu PCI device and print the
+ * BDF (or an ECHEC line).  Returns 0 when found. */
+int gpu_pci_report(gpu_ctx *g);
 int gpu_pci_init(gpu_ctx *g, bool allow_msix);
 void gpu_pci_fini(gpu_ctx *g);
 /* GET_DISPLAY_INFO: fills g->width/height/num_scanouts. */
@@ -92,5 +95,9 @@ void gpu_resmgr_loop(void); /* does not return */
 
 /* Logging: driver-side only (core/ stays silent, CONTRACT.md §2). */
 void gpu_log(const gpu_ctx *g, const char *fmt, ...);
+/* Console announcement for the phase-1 serial log (see gpu_ctrl.c). */
+void gpu_announce(const char *fmt, ...);
+/* Short reason string for an ECHEC console line. */
+const char *gpu_rc_reason(int rc);
 
 #endif /* TOILE_GPU_PRIV_H */

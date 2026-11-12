@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 #
 # Toile — Makefile (CONTRACT.md §12). Cibles gelées :
-#   help build test-c test-py diff golden guards test qemu-demo clean
+#   help build test-c test-py diff golden guards test qemu-demo bench clean
 # Aucune dépendance externe à QNX/QEMU/GPU pour `make test` (S9).
 SHELL := /bin/bash
 CC := gcc
@@ -18,7 +18,7 @@ SRC_TESTS := $(wildcard core/tests/test_*.c)
 TEST_BINS := $(patsubst core/tests/%.c,$(BUILD)/%,$(SRC_TESTS))
 
 .DEFAULT_GOAL := help
-.PHONY: help build test-c test-py diff golden guards test qemu-demo clean
+.PHONY: help build test-c test-py diff golden guards test qemu-demo bench clean
 
 help: ## liste les cibles disponibles
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | sort | \
@@ -83,6 +83,13 @@ qemu-demo: ## volet A : exige SDP QNX + QEMU (jamais appele en CI PR)
 	fi; \
 	echo "qemu-demo: lancement de qemu/run-demo.sh"; \
 	qemu/run-demo.sh
+
+bench: $(BUILD)/bench-model ## debit du coeur portable (essai E5, hors CI PR)
+	@$(BUILD)/bench-model
+
+$(BUILD)/bench-model: tools/bench-model.c $(OBJ_CORE) $(HDRS)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $< $(OBJ_CORE)
 
 clean: ## supprime build/ et les __pycache__
 	rm -rf $(BUILD)

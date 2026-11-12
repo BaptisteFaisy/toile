@@ -358,7 +358,7 @@ Visuel : fenêtre QEMU avec le bureau QNX + terminal hôte montrant les tests. P
 | QEMU fournit `virtio-gpu-pci` mature | Vrai (standard, utilisé par Linux/BSD) ; à confirmer côté invité QNX (E1) |
 | Transport virtio réutilisable depuis Passerelle | À valider (E3) |
 | DDK hyperviseur accessible en licence non commerciale | **Non vérifié** (E4) — bloque le volet B seulement |
-| Interface display driver Screen | À relire dans le Screen Developer's Guide (E2) |
+| Interface display driver Screen | **Vérifié le 2026-11-12** : le contrat réel n'est **pas** `io-display` (absent du SDP 8.0) mais un **driver OpenWF Display (WFD)** couplé à la **bibliothèque Wfdcfg** — en-têtes `WF/wfd.h`, `WF/wfdext.h`, `wfdqnx/wfdcfg.h` du SDP 8.0, points d'entrée relus et squelette compilé (`qcc … -lscreen`). **Intégration non testée** : `libWFDplatform`, `wfd-server` et `libwfdcfg.so` sont hors du SDP libre (BSP « Screen Board Support package »). Voir `docs/TRIALS-E1-E4.md` §E2 et les décisions D17/D18 |
 | Structures virtio-gpu de QEMU | À relire dans les sources QEMU (`hw/display/virtio-gpu.c`) |
 | `TRANSFER_FROM_HOST_2D` existe (cité en §2.3) | **Corrigé le 2026-11-12** : inexistant en virtio 1.x — la lecture hôte → invité est `TRANSFER_FROM_HOST_3D` (**0x0206**), valable aussi pour une ressource créée en 2D ; Toile l'expose sous le nom `transfer_from_host` |
 | `SET_CURSOR` (**0x0302**) existe (cité en §2.3) | **Corrigé le 2026-11-12** : inexistant — l'enum `virtio_gpu_ctrl_type` s'arrête à `MOVE_CURSOR` (**0x0301**) ; Toile n'implémente pas 0x0302 |
@@ -369,8 +369,10 @@ Mise à jour du **2026-11-12** : relecture de l'en-tête standard `virtio_gpu.h`
 (`enum virtio_gpu_ctrl_type`, `enum virtio_gpu_formats`, `struct
 virtio_gpu_ctrl_hdr`, `VIRTIO_GPU_MAX_SCANOUTS`). Les deux corrections ci-dessus
 sont gravées dans `CONTRACT.md` §3 et §9, détaillées dans `docs/GAP.md` §3 et
-`docs/VIRTIO-GPU.md` §4. Elles ne changent aucun autre statut : **E1, E2, E4 et
-E5 restent non tranchés**, aucun essai sur cible n'a été mené.
+`docs/VIRTIO-GPU.md` §4. Elles ne changent aucun autre statut. **E1** est
+tranché (positif), **E2** partiellement tranché (interface WFD + Wfdcfg
+identifiée, intégration non testée), **E4** tranché (négatif), **E5** : débit
+du modèle mesuré (`docs/TRIALS-E5.md`), débit réel invité → hôte non mesuré.
 
 Comme Tamis et Veille : toute correction d'affirmation est consignée ici.
 

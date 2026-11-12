@@ -314,6 +314,7 @@ Codes de sortie : `0` aucune erreur, `1` au moins un verdict de sévérité
 | `make guards` | `.github/checks/taille.py` + `.github/checks/api-frozen.py` |
 | `make test` | `build test-c test-py diff guards` — **vert sans QNX, QEMU ni GPU** (S9) |
 | `make qemu-demo` | volet A : documenté, exige SDP QNX + QEMU, jamais appelé en CI PR |
+| `make bench` | débit du cœur portable (essai E5) : `tools/bench-model.c`, hors CI PR |
 | `make clean` | supprime `build/` et `__pycache__/` |
 
 ## 13. Gardes CI (budget 5 min)

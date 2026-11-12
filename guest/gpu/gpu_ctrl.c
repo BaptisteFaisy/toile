@@ -45,7 +45,42 @@ void gpu_log(const gpu_ctx *g, const char *fmt, ...)
     fputs("toile-gpu: ", stderr);
     vfprintf(stderr, fmt, ap);
     fputc('\n', stderr);
+    fflush(stderr);
     va_end(ap);
+}
+
+/* On-console announcement (phase-1 evidence).  Written to stdout so the
+ * line lands on the serial console verbatim, prefixed "TOILE: " and
+ * flushed immediately: the VM may be killed right after the verdict. */
+void gpu_announce(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    fputs("TOILE: ", stdout);
+    vfprintf(stdout, fmt, ap);
+    fputc('\n', stdout);
+    fflush(stdout);
+    va_end(ap);
+}
+
+/* Short human-readable reason for a transport/core result code, used to
+ * build the ECHEC console lines.  ASCII only (serial console safety). */
+const char *gpu_rc_reason(int rc)
+{
+    switch (rc) {
+    case TOILE_TR_EINVAL:
+    case -TOILE_TR_EINVAL: return "argument invalide";
+    case TOILE_TR_ENODEV:
+    case -TOILE_TR_ENODEV: return "peripherique absent";
+    case TOILE_TR_ENOMEM:
+    case -TOILE_TR_ENOMEM: return "memoire";
+    case TOILE_TR_EIO:
+    case -TOILE_TR_EIO:     return "E/S transport";
+    case TOILE_TR_ETIME:
+    case -TOILE_TR_ETIME:   return "delai expire";
+    default: break;
+    }
+    return rc == TOILE_OK ? "ok" : "echec";
 }
 
 static int gpu_model_apply(gpu_ctx *g, const toile_cmd *cmd)

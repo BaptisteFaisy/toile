@@ -68,6 +68,8 @@ GPU_SRCS       := gpu_pci.c gpu_ctrl.c gpu_resource.c gpu_mire.c \
                    gpu_resmgr.c gpu_main.c
 COMMON_SRCS    := toile_pattern.c
 VIRTIO_SRCS    := toile_transport.c
+# Client de preuve /dev/gpu0 (essai « le pilote démarre dans l'invité »).
+PROBE_SRCS     := toile_gpu_probe.c
 
 # Couche commune Passerelle : seul log.c est nécessaire ici (pgw_log_write,
 # pgw_stat_add).
@@ -78,17 +80,20 @@ CORE_OBJS      := $(addprefix $(BUILD)/core/,$(notdir $(CORE_SRCS:.c=.o)))
 GPU_OBJS       := $(addprefix $(BUILD)/gpu/,$(GPU_SRCS:.c=.o))
 COMMON_OBJS    := $(addprefix $(BUILD)/common/,$(COMMON_SRCS:.c=.o))
 VIRTIO_OBJS    := $(addprefix $(BUILD)/virtio/,$(VIRTIO_SRCS:.c=.o))
+PROBE_OBJS     := $(addprefix $(BUILD)/common/,$(PROBE_SRCS:.c=.o))
 
 DRIVER_BIN     := $(BUILD)/toile-gpu
 DISPLAY_BIN    := $(BUILD)/toile-display
 INPUT_BIN      := $(BUILD)/toile-input
+PROBE_BIN      := $(BUILD)/toile-gpu-probe
 
-.PHONY: all driver display input patch clean dirs
-all: driver display input
+.PHONY: all driver display input probe patch clean dirs
+all: driver display input probe
 
 driver: $(DRIVER_BIN)
 display: $(DISPLAY_BIN)
 input: $(INPUT_BIN)
+probe: $(PROBE_BIN)
 
 # --- préparation : copie du transport Passerelle + patch -------------------
 patch: $(PATCH_STAMP)
@@ -140,6 +145,11 @@ $(DISPLAY_BIN): $(BUILD)/display/toile_display.o $(BUILD)/display/toile_dispskel
 $(INPUT_BIN): $(BUILD)/input/toile_input.o $(VIRTIO_OBJS) $(PGW_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) -V $(TOILE_VARIANT) $^ $(LDFLAGS) -o $@
+
+# Client de preuve /dev/gpu0 : ouvre le noeud et interroge le pilote.
+$(PROBE_BIN): $(PROBE_OBJS) $(BUILD)/common/toile_gpu_client.o
+	@mkdir -p $(dir $@)
+	$(CC) -V $(TOILE_VARIANT) $^ -o $@
 
 $(BUILD)/display/%.o: $(TOILE_DIR)/display/%.c
 	@mkdir -p $(dir $@)

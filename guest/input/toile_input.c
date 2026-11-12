@@ -124,6 +124,11 @@ int main(void)
         toile_tr_close(tr);
         return 1;
     }
+    if (toile_tr_ready(tr) != TOILE_TR_OK) {
+        printf("  DRIVER_OK refuse par le peripherique\n");
+        toile_tr_close(tr);
+        return 1;
+    }
     input_event_loop(tr);
     toile_tr_close(tr);
     return 0;

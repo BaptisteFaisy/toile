@@ -28,6 +28,8 @@ changent dans la même PR.
 | D14 | Gardes CI en Python, pas de Node | CI | décidée |
 | D15 | Rectangle omis = toute la ressource | contrat | décidée |
 | D16 | Fail fast au premier contre-exemple | preuve | décidée |
+| D17 | L'interface d'un display driver tiers de Screen en QNX 8.0 est **OpenWF Display (WFD) + Wfdcfg**, pas `io-display` | implémentation | décidée (E2 partiellement tranché) |
+| D18 | Repli : framebuffer exposé via `/dev/gpu0`, consommé par une appli de démonstration, sans passer par Screen | implémentation | décidée (E2) |
 
 ---
 
@@ -304,3 +306,94 @@ changent dans la même PR.
   fois ; `toile-run run` renvoie le code de sortie 1 dès qu'un verdict d'erreur
   existe ; la réduction d'une divergence au plus court préfixe (comme sur
   Passerelle) devient triviale.
+
+### D17 — L'interface d'un display driver tiers de Screen en QNX 8.0 est OpenWF Display (WFD) + Wfdcfg, pas `io-display`
+
+- **Contexte** : le cahier des charges supposait que le contrat d'un display
+  driver tiers pour Screen était de la famille `io-display` (modèle QNX 6.x).
+  La relecture du SDP QNX 8.0 installé le 2026-11-12 (essai E2) contredit cette
+  hypothèse : `io-display` n'existe pas dans le SDP 8.0 (ni en-tête, ni
+  bibliothèque, ni répertoire `ddk/`). Ce qui est livré à la place, c'est une
+  pile OpenWF Display : les en-têtes `WF/wfd.h`, `WF/wfdext.h`,
+  `WF/wfdplatform.h` et `wfdqnx/wfdcfg.h`, la bibliothèque cliente
+  `libWFD.so`, et une documentation dédiée (`com.qnx.doc.screen.wfdcfg`,
+  `com.qnx.doc.screen.wfd-server`). La documentation du SDP est explicite :
+  *« Your display driver (WFD driver) is the primary user of the Wfdcfg
+  library »*.
+- **Décision** : Toile n'écrit **pas** de pilote `io-display`. Le display
+  driver tiers de Toile est un **driver OpenWF Display (WFD)** qui utilise la
+  bibliothèque **Wfdcfg** pour connaître les modes et attributs du matériel.
+  L'enchaînement retenu est celui du WFD, pas celui d'un modèle inventé :
+  `wfdEnumerateDevices` → `wfdCreateDevice` → `wfdEnumeratePorts` →
+  `wfdCreatePort` → `wfdSetPortMode` → `wfdCreatePipeline` →
+  `wfdCreateWFDEGLImagesQNX` → `wfdCreateSourceFromImage` →
+  `wfdBindSourceToPipeline` → `wfdDeviceCommit` (`WF/wfd.h:271`…`:485`,
+  `WF/wfdext.h:393`, `wfdqnx/wfdcfg.h:217`/`:272`/`:325`).
+  Les quatre appels « maison » `init` / `set_mode` / `flip` / `wait_vsync`
+  du squelette précédent sont **supprimés** : ils n'existaient dans aucune API
+  QNX et auraient produit un module non chargeable.
+- **Justification** : le SDP installé est une source primaire, et il est
+  catégorique : pas de `io-display`, mais un WFD complet côté en-têtes et
+  côté client (`libWFD.so` exporte les 15 symboles utilisés). Écrire contre
+  l'API réelle, c'est la seule façon d'obtenir un module que `wfd-server`
+  pourra charger. Le squelette `guest/display/toile_dispskel.c` compile et
+  se lie avec `qcc -V gcc_ntox86_64 … -lscreen`, 0 avertissement sous
+  `-Wall -Wextra -Werror` (recette exacte dans `guest/README.md`).
+- **Alternative écartée** : garder l'hypothèse `io-display` en attendant un
+  DDK. Rejeté : le DDK `io-display` n'est pas « absent pour l'instant », il
+  n'est **pas** l'API de QNX 8.0 — l'attendre serait attendre un objet qui
+  n'existe pas dans ce produit, et le squelette resterait un mensonge
+  technique.
+- **Conséquences** :
+  - l'interface est **connue**, mais l'**intégration n'est pas testée** :
+    `libWFDplatform`, `wfd-server` et `libwfdcfg.so` sont absents du SDP
+    libre (ils viennent des « Screen Board Support packages ») ; verdict E2 =
+    **PARTIELLEMENT TRANCHÉ** ;
+  - `guest/display/toile_dispskel.c` résout les points d'entrée WFD et
+    Wfdcfg par `dlopen`/`dlsym` : c'est la seule façon de lier sans
+    `libwfdcfg.so`, et cela permet au binaire de **dire précisément ce qui
+    manque** au lieu d'échouer au chargement ;
+  - `guest/display/toile_display.c` gagne un chemin `--wfd` qui échoue
+    proprement et le dit ;
+  - l'écart de testabilité est porté au cahier des charges §13 et à
+    `docs/GAP.md`.
+
+### D18 — Repli : framebuffer exposé via `/dev/gpu0`, consommé par une appli de démonstration, sans passer par Screen
+
+- **Contexte** : même avec l'interface WFD identifiée (D17), la pile serveur
+  (`wfd-server`, `libWFDplatform`, `libwfdcfg.so`) n'est pas installable dans
+  le périmètre du concours. Or le livrable S7 (« un framebuffer, une tête, une
+  mire puis le bureau ») doit être **démontrable** avant cette date. Le
+  pilote `guest/gpu/` expose déjà le framebuffer virtio-gpu par un resource
+  manager `/dev/gpu0` (devctl), sans dépendre de Screen.
+- **Décision** : Toile livre **deux chemins de démonstration**, et le
+  framebuffer direct est le **chemin de repli officiel** :
+  - `--fb` : l'appli de démonstration ouvre `/dev/gpu0`, récupère la géométrie
+    négociée (`DCMD_TOILE_GPU_INFO`), peint la mire
+    (`DCMD_TOILE_GPU_MIRE`) et la pousse vers l'hôte. **Aucun passage par
+    Screen** ;
+  - `--screen` : client Screen (mire dans une fenêtre via
+    `screen_create_window` / `screen_post_window`) ;
+  - `--wfd` : le chemin WFD « pour de vrai », qui exige la pile serveur.
+  Le mode `--fb` est celui qui sert de **preuve de bout en bout** tant que le
+  WFD n'est pas déployable ; il n'est pas un pis-aller honteux, c'est un
+  chemin qui retire une dépendance entière (Screen) du périmètre du test.
+- **Justification** : le cœur de la démonstration Toile — un pilote
+  virtio-gpu qui alloue un framebuffer, le remplit et le présente à l'hôte —
+  s'exerce **sans** l'affichage QNX. Séparer le pilote (prouvé par le
+  transport et l'énumération PCI, E1) de la couche d'affichage QNX (non
+  déployable ici) permet de montrer ce qui marche vraiment, sans faire
+  porter à une démo le poids d'un composant hors licence.
+- **Alternative écartée** : n'exposer que le chemin Screen, en attendant le
+  BSP. Rejeté : rien ne serait démontrable avant le 15/12, et le dépôt
+  perdrait sa seule preuve exécutable. Écartée aussi l'option d'écrire un
+  driver `io-display` « au cas où » : elle est déjà invalidée par D17.
+- **Conséquences** :
+  - `guest/display/toile_display.c` expose `--screen`, `--fb` et `--wfd` ;
+  - le tableau de statut de `docs/GAP.md` passe S7 de « non vérifié (bloqué
+    par E2) » à « partiellement vérifié » : le squelette **compile et se
+    lie**, le chemin `--fb` est écrit, son exécution reste à faire sur cible ;
+  - le §12 du cahier des charges (repli) et son §13 (statut des
+    affirmations) sont alignés sur cette décision ;
+  - `--fb` utilise aujourd'hui `MAP_PHYS` côté client (démonstration root) :
+    ce n'est pas la voie de production, et le document le dit.

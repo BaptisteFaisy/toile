@@ -28,7 +28,7 @@ comme tel dans la soumission au concours.
 | Code | Trou, tel que formulé dans l'inventaire | Source | Statut |
 |---|---|---|---|
 | **G1** | **virtio-gpu absent** des ~20 vdev livrés avec QNX Hypervisor | Inventaire lot D (liste des vdev vérifiée) | **non vérifié** — à revérifier page à page dans le SDP installé |
-| **G2** | **Aucun display driver Screen pour virtio-gpu** en invité : Screen ne sait pas parler à un GPU virtuel | Inventaire lot D | **non vérifié** — à revérifier (Screen Developer's Guide, essai E2) |
+| **G2** | **Aucun display driver Screen pour virtio-gpu** en invité : Screen ne sait pas parler à un GPU virtuel | Inventaire lot D | **partiellement vérifié** — l'interface réelle est identifiée : **OpenWF Display (WFD) + Wfdcfg**, pas `io-display` (en-têtes `WF/wfd.h`, `WF/wfdext.h`, `wfdqnx/wfdcfg.h` du SDP 8.0) ; l'**intégration** n'est pas testée (`libWFDplatform`, `wfd-server`, `libwfdcfg.so` hors SDP libre) — E2, décision D17 |
 | **G3** | **Screen inutilisable en invité sans passthrough** matériel — le trou le plus cité de l'inventaire | Inventaire lot D | **partiellement vérifié** — vérifié dans l'inventaire lot D ; à confirmer sur QEMU (E1/E2) |
 | **G4** | **virtio-input absent** (clavier/souris en VM) : même avec l'affichage, les entrées manquent | Inventaire lot D (idée « Main ») | **non vérifié** — même nature d'absence que G1 |
 | **G5** | **Aucune virtualisation GPU documentée** dans la doc publique QNX 8.0 | Inventaire | **partiellement vérifié** — absence constatée dans la doc publique consultée, non dans le SDP installé |
@@ -49,8 +49,8 @@ montrant le bureau QNX s'afficher dans une fenêtre QEMU (démo, exigence S8).
 | S3 | Jumeau Python + différentiel C↔Python vert | `host/toile/`, `tests/differential.py`, `make diff` | **non vérifié** (lot L2 à écrire) |
 | S4 | Fixtures de référence (boot graphique, resize, multi-ressource) | `fixtures/*.tcl`, `fixtures/wire/*.hex`, `fixtures/golden/*` | **non vérifié** (lot L3 à écrire) |
 | S5 | Transport virtio Passerelle **adapté, non réécrit** | `guest/virtio/toile_transport.{h,c}`, `toile-virtio-gpu.patch` | **partiellement vérifié** (adaptation écrite, non compilée sur cible QNX) |
-| S6 | Driver invité minimal : énumération PCI, controlq, scanout unique, flush | `guest/gpu/` | **non vérifié** (lot L5, bloqué par E1) |
-| S7 | Display driver Screen minimal : un framebuffer, une tête, une mire puis le bureau | `guest/display/` | **non vérifié** (lot L6, bloqué par E2) |
+| S6 | Driver invité minimal : énumération PCI, controlq, scanout unique, flush | `guest/gpu/` | **partiellement vérifié** (2026-11-12 : le pilote **tourne dans un invité QNX 8.0**, trouve le `virtio-gpu`, négocie, reçoit `GET_DISPLAY_INFO`, fait accepter `RESOURCE_CREATE_2D`+backing+`SET_SCANOUT`, et publie `/dev/gpu0` — voir `docs/TRIALS-E1-E6.md` §E6 ; **reste ouvert** : le resource manager plante quand un client ouvre `/dev/gpu0`) |
+| S7 | Display driver Screen minimal : un framebuffer, une tête, une mire puis le bureau | `guest/display/` | **partiellement vérifié** (lot L6) — l'interface est **identifiée** (WFD + Wfdcfg, décision D17) et le squelette **compile et se lie** (`qcc … -lscreen`, 0 warning) ; l'**intégration** reste non testée faute de `libWFDplatform` / `wfd-server` / `libwfdcfg.so` ; repli `--fb` livré (décision D18) |
 | S8 | Démo QEMU : image invitée qui démarre Screen dans la fenêtre QEMU | `image/`, `qemu/`, `make qemu-demo` | **non vérifié** (lot L7, exige SDP + QEMU) |
 | S9 | `make test` vert **sans QNX, sans QEMU, sans GPU** | `make test` = `build test-c test-py diff guards` | **non vérifié** (le `Makefile` n'est pas encore écrit) |
 | S10 | CI : build `-Werror`, tests, différentiel, garde taille, budget ≤ 5 min | `.github/workflows/ci.yml`, `.github/checks/*.py` | **non vérifié** (gardes à écrire, cibles gelées par `CONTRACT.md` §13) |
@@ -99,10 +99,10 @@ Les codes conservés et vérifiés le même jour : `0x0100` `get_display_info`,
 
 | Point ouvert | Pourquoi ça bloque | Qui tranche |
 |---|---|---|
-| **Interface display driver Screen exacte** (contrat `io-display`, bibliothèque, points d'entrée) | S7 ne peut pas être écrit sérieusement sans le contrat réel ; un display driver inventé ne charge pas | **E2** — relecture du Screen Developer's Guide dans le SDP installé, puis essai de chargement |
-| **DDK hyperviseur en licence non commerciale** (QNX Everywhere) | le volet B (X1) exige d'écrire un vdev côté hôte ; sans accès, pas de volet B | **E4** — demande de licence et lecture des termes ; ne bloque **que** X1 |
+| **Interface display driver Screen exacte** (WFD + Wfdcfg : points d'entrée, couche plateforme, greffon) | l'interface est **identifiée** (WFD + Wfdcfg) et le squelette compile ; il reste à **exécuter** le pipeline WFD sur cible, ce qu'exige une pile serveur absente du SDP libre | **E2 (partiellement tranché)** — interface identifiée, intégration non testée ; **reste à faire** : obtenir le BSP Screen (`libWFDplatform`, `wfd-server`, `libwfdcfg.so`), démarrer `wfd-server`, brancher le framebuffer virtio-gpu sur la source WFD |
+| **DDK hyperviseur en licence non commerciale** (QNX Everywhere) | le volet B (X1) exige d'écrire un vdev côté hôte ; sans accès, pas de volet B | **E4 — TRANCHÉ, NÉGATIF** (2026-11-12) : licence Education sans fonctionnalité Hypervisor, DDK absent des 225 paquets ; ne bloque **que** X1 (volet A, décision D3, n'en dépend pas) |
 | **Performances d'un flush 2D** (copie du framebuffer vers l'hôte, ≥ 15–20 images/s en 1080p) | décide si le bureau est utilisable ou s'il faut dégainer dommages/double tampon/blob | **E5** — mesure sur cible ; non bloquant, ajuste les ambitions C |
-| **Énumération PCI du `virtio-gpu-pci` par un invité QNX 8.0** | sans elle, aucun pilote n'a de périphérique à ouvrir | **E1** — boot QEMU + `pci`/`libpci` en invité |
+| **Énumération PCI du `virtio-gpu-pci` par un invité QNX 8.0** | sans elle, aucun pilote n'a de périphérique à ouvrir | **TRANCHÉ — POSITIF** (E1, `docs/TRIALS-E1-E4.md` §E1) ; **et** l'énumération par le *pilote* est prouvée en plus (`docs/TRIALS-E1-E6.md` §E6) |
 | **Réutilisation effective du transport Passerelle** (files multiples, MSI-X) | l'adaptation est écrite, pas compilée ni exécutée sur cible | **E3** — compilation `qcc` de `guest/virtio/` + patch appliqué à une copie de build |
 
 ## 5. Registre de statut consolidé
@@ -115,11 +115,13 @@ Les codes conservés et vérifiés le même jour : `0x0100` `get_display_info`,
 | `SET_CURSOR` 0x0302 inexistant (l'enum s'arrête à 0x0301) | **vérifié** |
 | API publique C du cœur (`core/include/toile/*.h`) conforme à `CONTRACT.md` §10 | **vérifié** (en-têtes écrits ; garde `api-frozen.py` à exécuter) |
 | Attribution du transport (Apache-2.0) et des structures (BSD) | **vérifié** (`NOTICE`) |
-| QEMU fournit un périphérique `virtio-gpu-pci` mature | **partiellement vérifié** (standard utilisé par Linux/BSD ; côté invité QNX = E1) |
-| Transport Passerelle réutilisable pour virtio-gpu | **partiellement vérifié** (adaptation écrite, non compilée/exécutée = E3) |
+| QEMU fournit un périphérique `virtio-gpu-pci` mature | **partiellement vérifié** (standard utilisé par Linux/BSD ; côté invité QNX = E1 ; **côté pilote Toile = vérifié** : `GET_DISPLAY_INFO` et `RESOURCE_CREATE_2D` acceptés, `docs/TRIALS-E1-E6.md` §E6) |
+| Transport Passerelle réutilisable pour virtio-gpu | **partiellement vérifié** (adaptation écrite et **exécutée** sur cible = E3 + `docs/TRIALS-E1-E6.md` §E6 ; **deux écarts corrigés par patch** : marche des capacités PCI et séquence de statut virtio, cf. `guest/virtio/toile-virtio-gpu.patch`) |
+| Le pilote invité démarre dans un invité QNX 8.0 et crée `/dev/gpu0` | **vérifié** (2026-11-12, `docs/TRIALS-E1-E6.md` §E6) — **réserve** : un client ne peut pas encore ouvrir `/dev/gpu0` (la bibliothèque resmgr QNX 8.0 plante sur le message `_IO_CONNECT`) |
 | Screen inutilisable en invité sans passthrough (G3) | **partiellement vérifié** (inventaire lot D ; confirmation QEMU = E1/E2) |
 | Cœur C11 implémenté et tests verts sans cible | **non vérifié** (implémentation en cours, `Makefile` absent) |
-| Interface display driver Screen | **non vérifié** (E2) |
-| DDK hyperviseur accessible en licence non commerciale | **non vérifié** (E4) |
+| Interface display driver Screen | **partiellement vérifié** (E2, 2026-11-12) — **OpenWF Display (WFD) + Wfdcfg** ; `io-display` n'existe pas dans le SDP 8.0 ; intégr. non testée (BSP absent) |
+| DDK hyperviseur accessible en licence non commerciale | **vérifié — négatif** (E4, 2026-11-12) : licence Education `SDK \| GPL Utils \| IDE`, aucun paquet hyperviseur parmi les 225 installés |
 | Performances de flush suffisantes pour un bureau utilisable | **non vérifié** (E5) |
-| G1, G2, G4, G6 | **non vérifié** (à revérifier dans le SDP installé) |
+| G1, G4, G6 | **non vérifié** (à revérifier dans le SDP installé) |
+| G2 | **partiellement vérifié** (E2) — interface display driver identifiée : WFD + Wfdcfg ; intégration non testée |

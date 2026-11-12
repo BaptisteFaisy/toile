@@ -21,9 +21,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sys/dispatch.h>
-#include <sys/iofunc.h>
+#include <sys/iofunc.h> /* QNX 8.0: must precede <sys/resmgr.h> so that
+                         * RESMGR_HANDLE_T is the iofunc attribute type */
 #include <sys/resmgr.h>
+#include <sys/dispatch.h>
 
 #define GPU_DEVPATH "/dev/gpu0"
 /* Message buffer headroom for resmgr_attach (payload fits: voir
@@ -95,6 +96,76 @@ static int gpu_io_devctl(resmgr_context_t *ctp, io_devctl_t *msg,
     return _RESMGR_PTR(ctp, &msg->o, sizeof(msg->o) + nbytes);
 }
 
+/* I/O-level stat handler.  The QNX 8.0 library can call it with a NULL
+ * OCB when the connect sequence did not create one: answer ENOSYS instead
+ * of dereferencing NULL (the resmgr must survive its clients). */
+static int gpu_io_stat(resmgr_context_t *ctp, io_stat_t *msg,
+                       RESMGR_OCB_T *ocb)
+{
+    if (ocb == NULL)
+        return ENOSYS;
+    return iofunc_stat_default(ctp, msg, (iofunc_ocb_t *)ocb);
+}
+
+/* Connect-level "combo" handler (QNX 8.0 optional callout).  The client
+ * library packs open()+stat() (or pathconf/chmod/chown/utime) into one
+ * _IO_CONNECT_COMBINE_CLOSE message; the library then calls the I/O
+ * handler with the OCB created by the open.  We do the whole sequence
+ * ourselves: open (without reply), the operation, then close the OCB. */
+static int gpu_connect_combo(resmgr_context_t *ctp, io_open_t *msg1,
+                              RESMGR_HANDLE_T *handle,
+                              _resmgr_combomsgs_t *msg2)
+{
+    if (msg2 == NULL)
+        return _RESMGR_DEFAULT;
+    int st = iofunc_open(ctp, msg1, (iofunc_attr_t *)handle, NULL, NULL);
+    if (st == -1) {
+        gpu_log(NULL, "resmgr: combo iofunc_open -> %d", st);
+        return st;
+    }
+    iofunc_ocb_t *ocb = (iofunc_ocb_t *)ctp->iov[0].iov_base;
+    if (ocb == NULL) {
+        gpu_log(NULL, "resmgr: combo sans OCB");
+        return ENOENT;
+    }
+    int r = ENOSYS;
+    switch (msg2->type) {
+    case _IO_STAT:
+        r = iofunc_stat_default(ctp, &msg2->stat, ocb);
+        break;
+    case _IO_PATHCONF:
+        r = iofunc_pathconf_default(ctp, &msg2->pathconf, ocb);
+        break;
+    case _IO_CHMOD:
+        r = iofunc_chmod_default(ctp, &msg2->chmod, ocb);
+        break;
+    case _IO_CHOWN:
+        r = iofunc_chown_default(ctp, &msg2->chown, ocb);
+        break;
+    case _IO_UTIME:
+        r = iofunc_utime_default(ctp, &msg2->utime, ocb);
+        break;
+    default:
+        break;
+    }
+    (void)iofunc_close_ocb_default(ctp, NULL, ocb);
+    gpu_log(NULL, "resmgr: combo type=0x%x -> %d", (unsigned)msg2->type, r);
+    return r;
+}
+
+/* Connect-level "open" handler (QNX 8.0).  The path manager sends an
+ * _IO_CONNECT to the server as soon as the node is attached; iofunc_func_init()
+ * leaves the connect table empty, so without this the resmgr dies on a
+ * NULL call while handling that first message. */
+static int gpu_connect_open(resmgr_context_t *ctp, io_open_t *msg,
+                             RESMGR_HANDLE_T *handle, void *extra)
+{
+    int st = iofunc_open_default(ctp, msg, handle, extra);
+    gpu_log(NULL, "resmgr: connect open -> %d (ioflag=0x%x)", st,
+            (unsigned)msg->connect.ioflag);
+    return st;
+}
+
 int gpu_resmgr_attach(gpu_ctx *g)
 {
     if (g == NULL)
@@ -105,13 +176,22 @@ int gpu_resmgr_attach(gpu_ctx *g)
         return -1;
     resmgr_attr_t rattr;
     memset(&rattr, 0, sizeof(rattr));
-    rattr.msg_max_size = GPU_MSG_MAX_SIZE;
+    /* Message buffer: big enough for the connect replies the QNX 8.0
+     * client library sends (a COMBINE_CLOSE packs a connect message and
+     * an I/O message). */
+    rattr.msg_max_size = 8192;
+    rattr.nparts_max = 4;
     resmgr_connect_funcs_t cfuncs;
     resmgr_io_funcs_t iofuncs;
     iofunc_func_init(_RESMGR_CONNECT_NFUNCS, &cfuncs,
                      _RESMGR_IO_NFUNCS, &iofuncs);
+    /* QNX 8.0: the path manager sends an _IO_CONNECT (subtype
+     * _IO_CONNECT_OPEN) to the server as soon as the node is attached; the
+     * connect-level "open" handler must answer it. */
+    cfuncs.open = gpu_connect_open;
+    cfuncs.combo = gpu_connect_combo;
     iofuncs.devctl = gpu_io_devctl;
-    iofunc_attr_init(&g_attr, 0666, NULL, NULL);
+    iofuncs.stat = gpu_io_stat;    iofunc_attr_init(&g_attr, 0666, NULL, NULL);
     int id = resmgr_attach(g_dpp, &rattr, GPU_DEVPATH, _FTYPE_ANY, 0,
                            &cfuncs, &iofuncs, &g_attr);
     if (id < 0) {
