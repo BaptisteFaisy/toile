@@ -31,7 +31,8 @@
     <tr><td><strong>E2</strong></td><td>Does Screen accept a third-party display driver, and what is the exact contract?</td><td><span class="badge part">interface identified, integration untested</span></td></tr>
     <tr><td><strong>E3</strong></td><td>Is the virtio transport reusable as-is for virtio-gpu?</td><td><span class="badge part">partially — reused with a patch</span></td></tr>
     <tr><td><strong>E4</strong></td><td>Is the hypervisor DDK available under a non-commercial licence?</td><td><span class="badge neg">negative</span></td></tr>
-    <tr><td><strong>E5</strong></td><td>Is a 2D flush fast enough for a usable desktop (&ge; 15&ndash;20 fps at 1080p)?</td><td><span class="badge na">not measured on target</span></td></tr>
+    <tr><td><strong>E5</strong></td><td>Is a 2D flush fast enough for a usable desktop (&ge; 15&ndash;20 fps at 1080p)?</td><td><span class="badge na">model measured, target not</span></td></tr>
+    <tr><td><strong>E6</strong></td><td>Does the guest driver start in a real QNX 8.0 guest, find the device and publish <code>/dev/gpu0</code>?</td><td><span class="badge pos">positive — executed</span></td></tr>
   </table>
 
   <h2>E1 — the device is enumerated</h2>
@@ -45,17 +46,33 @@
   off) mode, class <code>03/80/00</code> = display controller. The <code>virtio-vga</code> variant enumerates
   too (class <code>03/00/00</code>). Reproducible via <code>qemu/probe-e1.sh</code>.</p>
 
+  <h2>E6 — the guest driver really runs</h2>
+  <p>In a real QNX 8.0 guest (a minimal <code>mkifs</code> image booted under QEMU), the Toile guest
+  driver finds the virtio-gpu device, gets an answer to <code>GET_DISPLAY_INFO</code> (scanout 0,
+  1280&times;800), gets <code>RESOURCE_CREATE_2D</code> + backing + <code>SET_SCANOUT</code> accepted,
+  and publishes <code>/dev/gpu0</code>:</p>
+  <pre><code>TOILE: virtio-gpu trouve (1af4/1050) sur B000:D03:F00
+toile-gpu: scanout 0 mode 1280x800 (enabled)
+toile-gpu: scanout 0 &lt;- resource 1 (1280x800)
+TOILE: /dev/gpu0 pret</code></pre>
+  <p>One defect stays open and is documented rather than hidden: a client opening <code>/dev/gpu0</code>
+  still crashes inside QNX&rsquo;s resource-manager library, before any Toile handler runs.</p>
+
   <h2>E2, E3, E4 — read the docs</h2>
   <ul>
-    <li><strong>E2</strong>: the Screen display driver interface is in the SDP headers; aligning the guest
-    driver to the real API is the next step, after which the integration still has to be proven on a VM.</li>
+    <li><strong>E2</strong>: the real contract for a third-party Screen display driver in QNX 8.0 is
+    <strong>OpenWF Display (WFD) + Wfdcfg</strong>, <em>not</em> <code>io-display</code> (a QNX 6.x model
+    absent from the SDP). The guest code is aligned to it and compiles; the integration cannot be
+    tested here because <code>libWFDplatform</code>, <code>wfd-server</code> and
+    <code>libwfdcfg.so</code> ship only in the Screen Board Support package.</li>
     <li><strong>E3</strong>: the Passerelle transport core is reusable; a ~100-line patch covers QNX 8.0 API
     differences. The transport is adapted, not rewritten.</li>
     <li><strong>E4</strong>: the hypervisor DDK is absent from the installed SDP and not covered by the
     installed licence — the host-side vdev (side B) stays conditional.</li>
   </ul>
 
-  <p>What is <strong>not yet</strong> measured on target: the real guest&rarr;host flush throughput (E5), the
+  <p>What is <strong>not yet</strong> measured on target: the real guest&rarr;host flush throughput (E5 &mdash;
+  the portable core&rsquo;s own throughput is measured and is ~27 000&times; above the computed need), the
   end-to-end vertical sync, and a full Screen desktop in the guest. These are stated plainly in the docs,
   not papered over.</p>
 </main>
