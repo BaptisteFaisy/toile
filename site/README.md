@@ -1,7 +1,7 @@
 # Site du projet Toile
 
 Site statique du projet, publié sur GitHub Pages :
-https://baptistefaisy.github.io/toile/
+https://tradoooo.github.io/toile/
 
 Contraintes (exprès) :
 
