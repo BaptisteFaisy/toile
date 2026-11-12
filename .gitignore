@@ -1,0 +1,15 @@
+build/
+build-*/
+__pycache__/
+*.pyc
+*.o
+*.a
+*.so
+*.d
+.fixtures-tmp/
+.qnx/
+
+# artefacts QNX / builds locaux
+guest/build/
+*.sym
+*.elf

@@ -1,0 +1,153 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# toile-virtio-gpu.patch - minimal upstream patch enabling virtio-gpu.
+#
+# Derived from the Passerelle project (same author,
+# github.com/BaptisteFaisy/passerelle), virtio transport layer,
+# Copyright the Passerelle authors, licensed Apache-2.0.
+# See the Toile NOTICE file at the repository root for attribution.
+#
+# Applied by guest/common.mk to a build-directory COPY of the sources
+# pointed to by PASSERELLE_DIR; the shared Passerelle tree is never
+# modified.  Candidate for upstream contribution (cahier des charges X5):
+#   - common/include/pgw/limits.h : virtio-gpu device id + modern PCI DID
+#   - virtio/src/pci_qnx.c        : pci_device_id_for() accepts type 16
+#   - virtio/src/pci_modern.c     : pci_id_matches() accepts DID 0x1050,
+#                                   pci_match_tag() skips tag for non-fs
+#   - virtio/src/mmio.c           : MMIO discovery accepts type 16,
+#                                   match_tag() skips tag for non-fs
+# Apply with:  patch -p1 -d <passerelle-copy-root> < this-file
+diff -ruN a/common/include/pgw/limits.h b/common/include/pgw/limits.h
+--- a/common/include/pgw/limits.h	2026-11-11 00:25:35.806879635 +0100
++++ b/common/include/pgw/limits.h	2026-11-12 15:42:22.005407762 +0100
+@@ -43,6 +43,10 @@
+ #define PGW_VIRTIO_PCI_DID_9P_TRANSITIONAL 0x1009u /* 0x1000 + 9 */
+ #define PGW_VIRTIO_PCI_DID_9P_MODERN       0x1049u /* 0x1040 + 9 */
+ #define PGW_VIRTIO_PCI_DID_FS_MODERN       0x105Au /* 0x1040 + 26 */
++#define PGW_VIRTIO_ID_GPU       16u
++#define PGW_VIRTIO_PCI_DID_GPU_MODERN      0x1050u /* 0x1040 + 16 */
++#define PGW_VIRTIO_ID_INPUT     18u
++#define PGW_VIRTIO_PCI_DID_INPUT_MODERN    0x1052u /* 0x1040 + 18 */
+ 
+ /* virtio-mmio magic and versions (VIO-03) */
+ #define PGW_MMIO_MAGIC      0x74726976u /* "virt" little-endian */
+diff -ruN a/virtio/src/mmio.c b/virtio/src/mmio.c
+--- a/virtio/src/mmio.c	2026-11-11 05:06:23.096807370 +0100
++++ b/virtio/src/mmio.c	2026-11-12 15:42:22.005983506 +0100
+@@ -243,6 +243,11 @@
+ 
+ static pgw_err match_tag(pgw_vio_dev *dev, const char *expected)
+ {
++    /* Only 9P and virtiofs carry a mount tag.  Other device types
++     * (e.g. virtio-gpu) have none: skip the tag read entirely. */
++    if (dev->info.device_id != (uint16_t)PGW_VIRTIO_ID_9P &&
++        dev->info.device_id != (uint16_t)PGW_VIRTIO_ID_FS)
++        return PGW_OK;
+     char tag[64];
+     pgw_err e;
+     if (dev->info.device_id == (uint16_t)PGW_VIRTIO_ID_9P) {
+@@ -281,7 +286,8 @@
+         return NULL;
+     }
+     uint32_t did = io.r32(io.ctx, PGW_MMIO_R_DEVICE_ID);
+-    if (did != PGW_VIRTIO_ID_9P && did != PGW_VIRTIO_ID_FS) {
++    if (did != PGW_VIRTIO_ID_9P && did != PGW_VIRTIO_ID_FS &&
++        did != PGW_VIRTIO_ID_GPU && did != PGW_VIRTIO_ID_INPUT) {
+         PGW_ERR("virtio-mmio: unsupported device id %u", (unsigned)did);
+         return NULL;
+     }
+diff -ruN a/virtio/src/pci_modern.c b/virtio/src/pci_modern.c
+--- a/virtio/src/pci_modern.c	2026-11-11 05:06:23.096807370 +0100
++++ b/virtio/src/pci_modern.c	2026-11-12 15:42:22.005774458 +0100
+@@ -397,11 +397,20 @@
+                pci_device_id == (uint16_t)PGW_VIRTIO_PCI_DID_9P_MODERN;
+     if (wanted_type == (uint16_t)PGW_VIRTIO_ID_FS)
+         return pci_device_id == (uint16_t)PGW_VIRTIO_PCI_DID_FS_MODERN;
++    if (wanted_type == (uint16_t)PGW_VIRTIO_ID_GPU)
++        return pci_device_id == (uint16_t)PGW_VIRTIO_PCI_DID_GPU_MODERN;
++    if (wanted_type == (uint16_t)PGW_VIRTIO_ID_INPUT)
++        return pci_device_id == (uint16_t)PGW_VIRTIO_PCI_DID_INPUT_MODERN;
+     return false;
+ }
+ 
+ static pgw_err pci_match_tag(pgw_vio_dev *dev, const char *expected)
+ {
++    /* Only 9P and virtiofs carry a mount tag.  Other device types
++     * (e.g. virtio-gpu) have none: skip the tag read entirely. */
++    if (dev->info.device_id != (uint16_t)PGW_VIRTIO_ID_9P &&
++        dev->info.device_id != (uint16_t)PGW_VIRTIO_ID_FS)
++        return PGW_OK;
+     char tag[64];
+     pgw_err e;
+     if (dev->info.device_id == (uint16_t)PGW_VIRTIO_ID_9P) {
+diff -ruN a/virtio/src/pci_qnx.c b/virtio/src/pci_qnx.c
+--- a/virtio/src/pci_qnx.c	2026-11-11 05:06:23.096807370 +0100
++++ b/virtio/src/pci_qnx.c	2026-11-12 15:42:22.005595020 +0100
+@@ -28,6 +28,7 @@
+ #include "pgw/log.h"
+ 
+ #include <errno.h>
++#include <sys/types.h> /* uint_t, attendu par <pci/pci.h> */
+ #include <pci/pci.h>
+ #include <stdint.h>
+ #include <stdlib.h>
+@@ -35,6 +36,16 @@
+ #include <sys/mman.h>
+ #include <sys/neutrino.h>
+ 
++/* Bits du registre de commande PCI (PCI Local Bus Specification 3.0,
++ * §6.2.2).  <pci/pci.h> de QNX 8.0 déclare pci_cmd_t mais ne nomme
++ * pas ces bits. */
++#ifndef PCI_CMD_MEM
++#define PCI_CMD_MEM    0x0002u /* memory space enable */
++#endif
++#ifndef PCI_CMD_MASTER
++#define PCI_CMD_MASTER 0x0004u /* bus master enable */
++#endif
++
+ #define PGW_QNX_MAX_BARS 6
+ #define PGW_QNX_IRQ_PRIO 21
+ #define PGW_QNX_PAGE     4096u
+@@ -78,7 +89,8 @@
+             return PGW_EIO;
+         uint32_t shift = 8u * (at & 3u);
+         word = (word & ~(0xFFu << shift)) | ((uint32_t)p[i] << shift);
+-        if (pci_device_cfg_wr32(q->hdl, (uint16_t)(at & ~3u), word) !=
++        if (pci_device_cfg_wr32(q->hdl, (uint16_t)(at & ~3u), word,
++                                NULL) !=
+             PCI_ERR_OK)
+             return PGW_EIO;
+     }
+@@ -112,7 +124,7 @@
+ 
+ static bool qnx_irq_attach(qnx_pci *q)
+ {
+-    uint32_t nirq = 0;
++    int_t nirq = 0; /* <pci/pci.h>: pci_device_read_irq prend int_t */
+     pci_irq_t irqs[4] = {0, 0, 0, 0};
+     if (pci_device_read_irq(q->hdl, &nirq, irqs) != PCI_ERR_OK || nirq == 0) {
+         PGW_ERR("virtio-pci: the device reports no interrupt line");
+@@ -172,6 +184,10 @@
+         return (uint16_t)PGW_VIRTIO_PCI_DID_9P_MODERN;
+     if (virtio_type == (uint16_t)PGW_VIRTIO_ID_FS)
+         return (uint16_t)PGW_VIRTIO_PCI_DID_FS_MODERN;
++    if (virtio_type == (uint16_t)PGW_VIRTIO_ID_GPU)
++        return (uint16_t)PGW_VIRTIO_PCI_DID_GPU_MODERN;
++    if (virtio_type == (uint16_t)PGW_VIRTIO_ID_INPUT)
++        return (uint16_t)PGW_VIRTIO_PCI_DID_INPUT_MODERN;
+     return 0;
+ }
+ 
+diff -ruN a/virtio/src/qnx_mem.c b/virtio/src/qnx_mem.c
+--- a/virtio/src/qnx_mem.c	2026-11-11 05:06:23.096807370 +0100
++++ b/virtio/src/qnx_mem.c	2026-11-12 15:42:22.005876027 +0100
+@@ -40,7 +40,8 @@
+     }
+     off64_t phys = 0;
+     size_t contig = 0;
+-    if (mem_offset64(p, NOFD, &phys, &contig) != 0 || contig < len) {
++    /* QNX 8.0: mem_offset64(addr, fd, len, off, contig_len). */
++    if (mem_offset64(p, NOFD, len, &phys, &contig) != 0 || contig < len) {
+         PGW_ERR("virtio: ring memory is not physically contiguous");
+         munmap(p, len);
+         return NULL;

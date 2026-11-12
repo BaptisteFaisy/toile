@@ -1,0 +1,17 @@
+Toile — pilote virtio-gpu 2D et intégration Screen pour QNX 8.0 en invité.
+
+Licence du projet : MIT (LICENSE).
+
+Composants tiers et prior art :
+
+- Transport virtio (PCI moderne MSI-X, MMIO v1/v2) : repris du projet frère
+  **Passerelle** (même auteur, github.com/BaptisteFaisy/passerelle), sous
+  licence **Apache-2.0**. Les fichiers de `guest/virtio/` qui en dérivent
+  conservent leur en-tête SPDX Apache-2.0 ; Toile ne réécrit pas le transport,
+  il l'adapte (cahier des charges §4, décision D2, essai E3).
+- Structures virtio-gpu : dérivées des en-têtes standard Linux/QEMU
+  `virtio_gpu.h` (Red Hat, licence BSD 3-clauses simplifiée), relus le
+  2026-11-12. Les valeurs d'enum et les dispositions de structures de
+  `core/include/toile/vgproto.h` en proviennent.
+- Spécification OASIS virtio 1.x, section « GPU Device » : standard ouvert,
+  aucune marque tierce n'est utilisée dans les supports de soumission.

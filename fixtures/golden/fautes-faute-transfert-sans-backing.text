@@ -1,0 +1,5 @@
+toile v1 text
+0000 TOILE_OK                   info cmd=0x0101 resource=1
+0001 TOILE_BACKING_MISSING      error cmd=0x0105 resource=1
+0002 TOILE_MODEL_CONSISTENT     info
+# state resources=1 scanouts=0 hash=83735bca02e061a6 applied=1 rejected=1 flushes=0 bytes=0 cursor=0,0,0,0,0,0

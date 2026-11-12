@@ -1,0 +1,4 @@
+toile v1 text
+0000 TOILE_CMD_INVALID          error cmd=0x0301 scanout=0 cause=cursor_not_visible
+0001 TOILE_MODEL_CONSISTENT     info
+# state resources=0 scanouts=0 hash=0c215095a9d4ee09 applied=0 rejected=1 flushes=0 bytes=0 cursor=0,0,0,0,0,0

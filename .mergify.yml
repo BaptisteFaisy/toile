@@ -1,0 +1,73 @@
+# File de merge Mergify — dépôt « Toile » (CI self-hosted R630, runner
+# r630-toile-01, label toile-worker).
+#
+# Mergify est le SEUL pilote de merge du dépôt. Le gate hermes-lite reste en
+# dry-run (variable de dépôt HERMES_LITE_DRY_RUN=1 déjà posée) : il observe,
+# annote et alerte, il ne fusionne jamais. Aucun pilote concurrent.
+#
+# Checks exigés = la CI réelle du dépôt : `ci` (make build/test-c/test-py/
+# diff/guards) et `ci-budget` (garde-fou ≤ 5 min, règle user 2026-10-24).
+# `stale-base-guard` est INFORMATIF (warning + exit 0) : jamais exigé ici,
+# le rafraîchissement est fait par update_method: rebase.
+# Structure copiée du .mergify.yml de BaptisteFaisy/duello (décision user
+# 2026-10-10) : inline labels urgent / priority-low identiques.
+
+queue_rules:
+  - name: default
+    queue_conditions:
+      # Conditions de file propres : PR ouverte, non draft, base main.
+      - -closed
+      - -draft
+      - -conflict
+      - base = main
+      # Checks requis (CONTRACT §13) : CI réelle + budget 5 min.
+      - check-success = ci
+      - check-success = ci-budget
+    batch_size:
+      min: 1
+      max: 3
+    batch_max_wait_time: "30 seconds"
+    max_checks_retries: 1
+    merge_method: rebase
+    update_method: rebase
+
+priority_rules:
+  - name: urgent
+    conditions:
+      - label = urgent
+    priority: high
+  - name: priority-low
+    conditions:
+      - label = priority-low
+    priority: low
+
+merge_queue:
+  # UN seul runner self-hosted (r630-toile-01) : spéculation bornée à 2 pour
+  # ne pas saturer le worker unique.
+  max_parallel_checks: 2
+
+# File automatique. Le produit natif « Merge Queue » seul ne suffit pas à
+# mettre une PR en file (mesuré le 11/11/2026 sur passerelle PR #1 : checks
+# verts, file vide). On déclare donc AUSSI la règle d'empilement, comme sur
+# BaptisteFaisy/duello (où mergify merge bien, mergedBy = app/mergify).
+pull_request_rules:
+  - name: file automatique des PR prêtes
+    conditions:
+      - -closed
+      - -draft
+      - -conflict
+      - base = main
+      - check-success = ci
+      - check-success = ci-budget
+      # Freins manuels : `hold` (règle du compte) et l'étiquette posée par le
+      # gate hermes-lite quand un rebase humain est nécessaire.
+      - -label = hold
+      - -label = hermes/conflit
+    actions:
+      queue:
+        name: default
+
+# Auto-queue natif (produit Merge Queue) : évite de dépendre du produit
+# « Workflow Automation », constaté désactivé le 24/10 sur d'autres dépôts.
+merge_protections_settings:
+  auto_merge_conditions: true

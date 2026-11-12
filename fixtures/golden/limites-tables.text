@@ -1,0 +1,85 @@
+toile v1 text
+0000 TOILE_OK                   info cmd=0x0101 resource=1
+0001 TOILE_OK                   info cmd=0x0101 resource=2
+0002 TOILE_OK                   info cmd=0x0101 resource=3
+0003 TOILE_OK                   info cmd=0x0101 resource=4
+0004 TOILE_OK                   info cmd=0x0101 resource=5
+0005 TOILE_OK                   info cmd=0x0101 resource=6
+0006 TOILE_OK                   info cmd=0x0101 resource=7
+0007 TOILE_OK                   info cmd=0x0101 resource=8
+0008 TOILE_OK                   info cmd=0x0101 resource=9
+0009 TOILE_OK                   info cmd=0x0101 resource=10
+0010 TOILE_OK                   info cmd=0x0101 resource=11
+0011 TOILE_OK                   info cmd=0x0101 resource=12
+0012 TOILE_OK                   info cmd=0x0101 resource=13
+0013 TOILE_OK                   info cmd=0x0101 resource=14
+0014 TOILE_OK                   info cmd=0x0101 resource=15
+0015 TOILE_OK                   info cmd=0x0101 resource=16
+0016 TOILE_OK                   info cmd=0x0101 resource=17
+0017 TOILE_OK                   info cmd=0x0101 resource=18
+0018 TOILE_OK                   info cmd=0x0101 resource=19
+0019 TOILE_OK                   info cmd=0x0101 resource=20
+0020 TOILE_OK                   info cmd=0x0101 resource=21
+0021 TOILE_OK                   info cmd=0x0101 resource=22
+0022 TOILE_OK                   info cmd=0x0101 resource=23
+0023 TOILE_OK                   info cmd=0x0101 resource=24
+0024 TOILE_OK                   info cmd=0x0101 resource=25
+0025 TOILE_OK                   info cmd=0x0101 resource=26
+0026 TOILE_OK                   info cmd=0x0101 resource=27
+0027 TOILE_OK                   info cmd=0x0101 resource=28
+0028 TOILE_OK                   info cmd=0x0101 resource=29
+0029 TOILE_OK                   info cmd=0x0101 resource=30
+0030 TOILE_OK                   info cmd=0x0101 resource=31
+0031 TOILE_OK                   info cmd=0x0101 resource=32
+0032 TOILE_OK                   info cmd=0x0101 resource=33
+0033 TOILE_OK                   info cmd=0x0101 resource=34
+0034 TOILE_OK                   info cmd=0x0101 resource=35
+0035 TOILE_OK                   info cmd=0x0101 resource=36
+0036 TOILE_OK                   info cmd=0x0101 resource=37
+0037 TOILE_OK                   info cmd=0x0101 resource=38
+0038 TOILE_OK                   info cmd=0x0101 resource=39
+0039 TOILE_OK                   info cmd=0x0101 resource=40
+0040 TOILE_OK                   info cmd=0x0101 resource=41
+0041 TOILE_OK                   info cmd=0x0101 resource=42
+0042 TOILE_OK                   info cmd=0x0101 resource=43
+0043 TOILE_OK                   info cmd=0x0101 resource=44
+0044 TOILE_OK                   info cmd=0x0101 resource=45
+0045 TOILE_OK                   info cmd=0x0101 resource=46
+0046 TOILE_OK                   info cmd=0x0101 resource=47
+0047 TOILE_OK                   info cmd=0x0101 resource=48
+0048 TOILE_OK                   info cmd=0x0101 resource=49
+0049 TOILE_OK                   info cmd=0x0101 resource=50
+0050 TOILE_OK                   info cmd=0x0101 resource=51
+0051 TOILE_OK                   info cmd=0x0101 resource=52
+0052 TOILE_OK                   info cmd=0x0101 resource=53
+0053 TOILE_OK                   info cmd=0x0101 resource=54
+0054 TOILE_OK                   info cmd=0x0101 resource=55
+0055 TOILE_OK                   info cmd=0x0101 resource=56
+0056 TOILE_OK                   info cmd=0x0101 resource=57
+0057 TOILE_OK                   info cmd=0x0101 resource=58
+0058 TOILE_OK                   info cmd=0x0101 resource=59
+0059 TOILE_OK                   info cmd=0x0101 resource=60
+0060 TOILE_OK                   info cmd=0x0101 resource=61
+0061 TOILE_OK                   info cmd=0x0101 resource=62
+0062 TOILE_OK                   info cmd=0x0101 resource=63
+0063 TOILE_OK                   info cmd=0x0101 resource=64
+0064 TOILE_CMD_INVALID          error cmd=0x0101 resource=65 cause=resource_table_full
+0065 TOILE_OK                   info cmd=0x0103 resource=1 scanout=0
+0066 TOILE_OK                   info cmd=0x0103 resource=2 scanout=1
+0067 TOILE_OK                   info cmd=0x0103 resource=3 scanout=2
+0068 TOILE_OK                   info cmd=0x0103 resource=4 scanout=3
+0069 TOILE_OK                   info cmd=0x0103 resource=5 scanout=4
+0070 TOILE_OK                   info cmd=0x0103 resource=6 scanout=5
+0071 TOILE_OK                   info cmd=0x0103 resource=7 scanout=6
+0072 TOILE_OK                   info cmd=0x0103 resource=8 scanout=7
+0073 TOILE_OK                   info cmd=0x0103 resource=9 scanout=8
+0074 TOILE_OK                   info cmd=0x0103 resource=10 scanout=9
+0075 TOILE_OK                   info cmd=0x0103 resource=11 scanout=10
+0076 TOILE_OK                   info cmd=0x0103 resource=12 scanout=11
+0077 TOILE_OK                   info cmd=0x0103 resource=13 scanout=12
+0078 TOILE_OK                   info cmd=0x0103 resource=14 scanout=13
+0079 TOILE_OK                   info cmd=0x0103 resource=15 scanout=14
+0080 TOILE_OK                   info cmd=0x0103 resource=16 scanout=15
+0081 TOILE_CMD_INVALID          error cmd=0x0103 resource=17 scanout=16 cause=scanout_id_out_of_range
+0082 TOILE_MODEL_CONSISTENT     info
+# state resources=64 scanouts=16 hash=884cf6c7a89ced7f applied=80 rejected=2 flushes=0 bytes=0 cursor=0,0,0,0,0,0

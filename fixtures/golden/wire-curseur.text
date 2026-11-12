@@ -1,0 +1,5 @@
+toile v1 text
+0000 TOILE_OK                   info cmd=0x0300 resource=2 scanout=0
+0001 TOILE_OK                   info cmd=0x0301 scanout=0
+0002 TOILE_MODEL_CONSISTENT     info
+# state resources=0 scanouts=0 hash=492b7b4c5225e1a2 applied=2 rejected=0 flushes=0 bytes=0 cursor=2,0,40,50,0,0

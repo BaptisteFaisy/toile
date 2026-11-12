@@ -1,0 +1,18 @@
+toile v1 text
+0000 TOILE_OK                   info cmd=0x0101 resource=1
+0001 TOILE_OK                   info cmd=0x0106 resource=1
+0002 TOILE_OK                   info cmd=0x0101 resource=2
+0003 TOILE_OK                   info cmd=0x0106 resource=2
+0004 TOILE_OK                   info cmd=0x0101 resource=3
+0005 TOILE_OK                   info cmd=0x0106 resource=3
+0006 TOILE_OK                   info cmd=0x0103 resource=1 scanout=0
+0007 TOILE_TRANSFER_OK          info cmd=0x0105 resource=1 rect=0,0,64,48
+0008 TOILE_OK                   info cmd=0x0104 resource=1
+0009 TOILE_OK                   info cmd=0x0103 resource=2 scanout=0
+0010 TOILE_TRANSFER_OK          info cmd=0x0105 resource=2 rect=0,0,128,96
+0011 TOILE_OK                   info cmd=0x0104 resource=2
+0012 TOILE_OK                   info cmd=0x0103 resource=3 scanout=0
+0013 TOILE_TRANSFER_OK          info cmd=0x0105 resource=3 rect=0,0,256,192
+0014 TOILE_OK                   info cmd=0x0104 resource=3
+0015 TOILE_MODEL_CONSISTENT     info
+# state resources=3 scanouts=1 hash=7e9afe5a8e23b54a applied=15 rejected=0 flushes=3 bytes=258048 cursor=0,0,0,0,0,0

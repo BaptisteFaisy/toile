@@ -1,0 +1,1 @@
+{"toile":"1","state":{"resources":0,"scanouts":0,"hash":"0c215095a9d4ee09","applied":0,"rejected":1,"flushes":0,"bytes":0,"cursor":{"resource":0,"scanout":0,"x":0,"y":0,"hot_x":0,"hot_y":0,"visible":0}},"verdicts":[{"i":0,"code":"TOILE_CMD_INVALID","sev":"error","cmd":"0x0101","resource":1,"cause":"bad_geometry"},{"i":1,"code":"TOILE_MODEL_CONSISTENT","sev":"info"}]}

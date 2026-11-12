@@ -1,0 +1,37 @@
+name: hermes-lite (escalade conflit — alerte)
+
+# Alerte humaine : liste les PR portant hermes/conflit (gate resté rouge).
+# Lancement manuel (workflow_dispatch) — PAS de cron schedule (règle CI du
+# dépôt : aucun `schedule:` ; le nominal est couvert par pull_request et
+# check_run dans hermes-lite.yml). Ce workflow ne fait qu'imprimer l'état,
+# il ne modifie rien et ne fusionne jamais.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  pull-requests: read
+
+concurrency:
+  group: hermes-lite-alert-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  alert:
+    name: Lister les PR en conflit
+    runs-on: [self-hosted, toile-worker]
+    timeout-minutes: 5
+    steps:
+      - name: Rapport
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "PR ouvertes portant hermes/conflit :"
+          # curl + python en UNE ligne : pas besoin de gh (absent du PATH par
+          # défaut du runner), et les scripts python multi-lignes dans un bloc
+          # YAML gardent leur indentation → IndentationError (constaté le
+          # 2026-10-24 sur r630-muse-01).
+          curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues?state=open&labels=hermes%2Fconflit&per_page=100" \
+            | python3 -c 'import sys,json;d=json.load(sys.stdin);items=d if isinstance(d,list) else [];print("  (aucune)" if not items else "\n".join("  #{} {}".format(i["number"],i["title"]) for i in items))'

@@ -1,0 +1,66 @@
+name: ci
+
+# CI réelle du dépôt « Toile » : build C + tests C + tests Python +
+# différentiel C↔Python sur fixtures + gardes (taille, API gelée).
+# Tout tourne sur l'unique runner self-hosted r630-toile-01 (Debian 13,
+# labels self-hosted,toile-worker) : python3 3.13, gcc 14.2, make sont
+# dans /usr/bin. Budget : verdict ≤ 5 min (règle user 2026-10-24,
+# ~/Bureau/CI-BUDGET-5MIN.md et CONTRACT.md §13).
+# Le volet QNX/QEMU (`make qemu-demo`) exige SDP + GPU virtuel : il n'est
+# JAMAIS appelé ici (CONTRACT §12 : « jamais appelé en CI PR »).
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Un push sur la PR annule le run précédent : ne jamais gaspiller le runner.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: [self-hosted, toile-worker]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (superficiel)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Préparer PATH (python3, make, outils r630)
+        run: |
+          # Le PATH par défaut du runner (/home/baptiste/.local/bin:/usr/local/
+          # sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin) contient déjà
+          # python3 et make ; on échoue vite avec un message explicite sinon.
+          command -v python3 >/dev/null || { echo "::error::python3 absent du PATH du runner r630-toile-01"; exit 1; }
+          command -v make >/dev/null || { echo "::error::make absent du PATH du runner r630-toile-01"; exit 1; }
+          command -v gcc >/dev/null || { echo "::error::gcc absent du PATH du runner r630-toile-01"; exit 1; }
+          # /home/baptiste/bin (gh, outils maison) N'EST PAS dans le PATH par
+          # défaut : l'ajouter s'il existe (inoffensif pour la CI pure).
+          if [ -d /home/baptiste/bin ]; then
+            echo "/home/baptiste/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Construction (gcc -std=c11 -O2 -Werror)
+        run: make build
+
+      - name: Tests unitaires C (core/tests)
+        run: make test-c
+
+      - name: Tests unitaires Python (host/tests, stdlib unittest)
+        run: make test-py
+
+      - name: Différentiel C↔Python sur toutes les fixtures (octet pour octet)
+        run: make diff
+
+      - name: Gardes (taille < 500 lignes, API gelée §10)
+        run: make guards

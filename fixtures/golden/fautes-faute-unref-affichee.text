@@ -1,0 +1,7 @@
+toile v1 text
+0000 TOILE_OK                   info cmd=0x0101 resource=1
+0001 TOILE_OK                   info cmd=0x0106 resource=1
+0002 TOILE_OK                   info cmd=0x0103 resource=1 scanout=0
+0003 TOILE_SCANOUT_INVALID      error cmd=0x0102 resource=1 scanout=0
+0004 TOILE_MODEL_CONSISTENT     info
+# state resources=1 scanouts=1 hash=aac72096e56ecf31 applied=3 rejected=1 flushes=0 bytes=0 cursor=0,0,0,0,0,0

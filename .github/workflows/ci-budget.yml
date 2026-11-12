@@ -1,0 +1,39 @@
+name: ci-budget
+
+# Garde-fou « budget CI ≤ 5 min » (règle user 2026-10-24) : contrôle que
+# CHAQUE job de CHAQUE workflow du dépôt déclare timeout-minutes ≤ 5.
+# Script stdlib seule (.github/ci-budget/check_timeouts.py) : le runner
+# self-hosted n'a pas PyYAML garanti. Check requis par la file Mergify.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-budget-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-budget:
+    name: ci-budget
+    runs-on: [self-hosted, toile-worker]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (superficiel)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Préparer PATH (python3)
+        run: |
+          command -v python3 >/dev/null || { echo "::error::python3 absent du PATH du runner r630-toile-01"; exit 1; }
+
+      - name: Vérifier le budget de 5 min par job
+        run: python3 .github/ci-budget/check_timeouts.py
