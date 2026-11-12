@@ -1,5 +1,8 @@
 # GAP — l'écart entre l'existant et l'objectif
 
+> Note de preuve (côté `main`) : ligne ajoutée par la branche de base,
+> elle sert de zone de conflit pour l'essai du résolveur hermes.
+
 Ce document dit **ce qui manque** (les trous G1–G6 du cahier des charges §2.2),
 **ce que Toile livre** à chaque niveau d'ambition, et **ce qui a été corrigé**
 depuis la rédaction du cahier. Il tient aussi le registre d'honnêteté : trois
