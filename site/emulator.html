@@ -53,12 +53,19 @@
 
   <h2>Proofs</h2>
   <ul>
-    <li><strong>Numerical</strong>: the guest paints a known pattern and reads it back through the device
-    (<code>TRANSFER_FROM_HOST</code>, 0x0206); a matching checksum means the pixels actually travelled
-    guest &rarr; emulator &rarr; guest.</li>
-    <li><strong>Visual</strong>: a screen capture of the QEMU display, showing the pattern.</li>
+    <li><strong>Visual</strong> (done): a screen capture of the QEMU display shows the pattern the guest
+    painted — 1280&times;800, six colour bars.</li>
+    <li><strong>Numerical</strong> (pending): the guest paints a known pattern and reads it back through the
+    device (<code>TRANSFER_FROM_HOST</code>, 0x0206); a matching checksum proves the pixels travelled
+    guest &rarr; emulator &rarr; guest. Blocked on opening <code>/dev/gpu0</code> from a client.</li>
   </ul>
-  <!-- PREUVE-VISUELLE : capture de l'affichage QEMU, insérée une fois la preuve exécutée -->
+  <figure>
+    <img src="assets/toile-mire.png" alt="QEMU window showing the Toile test pattern, 1280 by 800, six coloured bars" width="640" height="400">
+    <figcaption>The QEMU display after the guest painted the test pattern:
+    1280&times;800 (= the scanout mode), six solid colour bars — captured headless via VNC +
+    <code>screendump</code>. Proof that the guest driver really paints into the emulator
+    (<a href="https://github.com/Tradoooo/toile/blob/main/docs/DEMO-EMULATEUR.md"><code>docs/DEMO-EMULATEUR.md</code></a>).</figcaption>
+  </figure>
 
   <p>The current state of the emulator loop is in
   <a href="https://github.com/Tradoooo/toile/blob/main/docs/TRIALS-E1-E6.md"><code>docs/TRIALS-E1-E6.md</code></a>.</p>
