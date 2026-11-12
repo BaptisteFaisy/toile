@@ -11,7 +11,27 @@
  */
 #include "gpu_priv.h"
 
+#include <pci/pci.h>
 #include <string.h>
+
+/* Phase-1 evidence: confirm the virtio-gpu PCI device is visible through
+ * the libpci client API (the same path the transport uses), and print the
+ * human-readable BDF on the serial console.  Returns 0 when found. */
+int gpu_pci_report(gpu_ctx *g)
+{
+    (void)g;
+    pci_bdf_t bdf = pci_device_find(0u, (pci_vid_t)TOILE_VIRTIO_PCI_VENDOR,
+                                    (pci_did_t)TOILE_VIRTIO_GPU_PCI_DID,
+                                    PCI_CCODE_ANY);
+    if (bdf == PCI_BDF_NONE) {
+        gpu_announce("ECHEC virtio-gpu (1af4/1050) absent du bus PCI");
+        return -1;
+    }
+    gpu_announce("virtio-gpu trouve (1af4/1050) sur B%03u:D%02u:F%02u",
+                 (unsigned)PCI_BUS(bdf), (unsigned)PCI_DEV(bdf),
+                 (unsigned)PCI_FUNC(bdf));
+    return 0;
+}
 
 /* struct virtio_gpu_config (OASIS virtio 1.x §5.7.4), all le32. */
 #define GPU_CFG_EVENTS_READ_OFF  0u
@@ -111,6 +131,13 @@ int gpu_pci_init(gpu_ctx *g, bool allow_msix)
     rc = gpu_open_queues(g);
     if (rc != TOILE_TR_OK)
         return rc;
+    /* The queues exist: the device may now serve them (virtio 1.2 §3.1.4.2
+     * requires DRIVER_OK to be set only after the virtqueues are set up). */
+    rc = toile_tr_ready(g->tr);
+    if (rc != TOILE_TR_OK) {
+        gpu_log(g, "DRIVER_OK refused (%d)", rc);
+        return rc;
+    }
     uint8_t cfg[GPU_CFG_SIZE];
     memset(cfg, 0, sizeof(cfg));
     (void)toile_tr_read_config(g->tr, 0u, cfg, sizeof(cfg));

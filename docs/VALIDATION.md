@@ -120,30 +120,31 @@ global est **5 minutes par job**, avec `concurrency` + `cancel-in-progress` et
 
 ## 8. Exigences → moyen de preuve → statut
 
-Statut au **2026-11-12**. Le socle est en cours d'écriture : ce tableau ne
-prétend rien de plus que ce qu'une commande du dépôt peut montrer aujourd'hui.
+Statut au **2026-11-12**. Chaque ligne renvoie à une **commande du dépôt** :
+ce qui est marqué « vérifié » se rejoue en local ou en CI, ce qui ne l'est pas
+est dit comme tel.
 
 | Exigence | Moyen de preuve | Statut |
 |---|---|---|
 | S1 `CONTRACT.md` gelé | fichier présent, §1–§13, symboles publics figés | **vérifié** |
-| S2 cœur C11 : machine à commandes + invariants | `make test-c` (P1, P2 sur toutes les fixtures) | non vérifié — implémentation en cours |
-| S3 jumeau Python + différentiel vert | `make diff` (§4) | non vérifié — lot L2 à écrire |
-| S4 fixtures de référence | `toile-run run` + goldens (`make golden`, `--expect`) | non vérifié — lot L3 à écrire |
+| S2 cœur C11 : machine à commandes + invariants | `make test-c` (P1, P2 sur toutes les fixtures) | **vérifié** — 4 binaires de test verts |
+| S3 jumeau Python + différentiel vert | `make diff` (§4) | **vérifié** — 21 fixtures, 63 comparaisons, 0 écart |
+| S4 fixtures de référence | `toile-run run` + goldens (`make golden`, `--expect`) | **vérifié** — 21 fixtures + 63 goldens |
 | S5 transport Passerelle adapté, non réécrit | compilation `qcc` de `guest/virtio/` + patch appliqué à une copie de build (E3) | partiellement vérifié — adaptation écrite, non compilée sur cible |
-| S6 driver invité minimal (PCI, controlq, scanout unique, flush) | boot QEMU + trace des commandes (E1, puis C8) | non vérifié — bloqué par E1 |
-| S7 display driver Screen minimal | chargement du driver par Screen dans l'invité (E2) | non vérifié — bloqué par E2 |
+| S6 driver invité minimal (PCI, controlq, scanout unique, flush) | boot QEMU + trace des commandes (E1, puis C8) | en cours — énumération PCI **vérifiée** (E1), pilote en cours de démarrage dans l'invité |
+| S7 display driver Screen minimal | chargement du driver par Screen dans l'invité (E2) | **bloqué** — interface réelle identifiée (OpenWF Display + Wfdcfg), DDK hors licence (E2) |
 | S8 démo QEMU (image invitée qui affiche) | `make qemu-demo`, capture vidéo | non vérifié — exige SDP + QEMU |
-| S9 `make test` vert sans QNX/QEMU/GPU | `make test` = `build test-c test-py diff guards` | non vérifié — `Makefile` non écrit |
-| S10 CI `-Werror`, tests, différentiel, gardes, ≤ 5 min | `.github/workflows/ci.yml` + les trois gardes | non vérifié — gardes à écrire |
+| S9 `make test` vert sans QNX/QEMU/GPU | `make test` = `build test-c test-py diff guards` | **vérifié** — vert, sans QNX/QEMU/GPU |
+| S10 CI `-Werror`, tests, différentiel, gardes, ≤ 5 min | `.github/workflows/ci.yml` + les trois gardes | **vérifié** — CI verte sur le runner r630, budget ≤ 5 min |
 | C1 multi-scanout | fixtures multi-scanout, P1 (I1, I5), différentiel | non vérifié |
 | C2 curseur matériel (`cursorq`) | fixtures `update_cursor`/`move_cursor`, P2 (`cursor_not_visible`) | non vérifié — commandes déjà dans le DSL S |
 | C3 suivi de dommages | fixtures à rectangles partiels, I6 (`bytes_transferred`) | non vérifié |
-| C4 double tampon + vsync | mesures sur cible (E5) | non vérifié |
+| C4 double tampon + vsync | mesures sur cible (E5) | non vérifié — E5 : débit du modèle **mesuré**, débit réel non mesuré (`docs/TRIALS-E5.md`) |
 | C5 virtio-input clavier/souris | essai en invité QEMU | non vérifié |
 | C6 intégration Screen complète | application Screen réelle lancée en invité | non vérifié — dépend de E2 |
 | C7 resource manager `/dev/gpu0` (ioctl/devctl) | client de test en invité | non vérifié |
 | C8 validation contre QEMU réel | capture puis rejeu dans le modèle (§6) | non vérifié |
-| C9 codelab 4 chapitres | relecture + exécution des commandes citées | non vérifié — lot parallèle |
+| C9 codelab 4 chapitres | relecture + exécution des commandes citées | **écrit** — 4 chapitres ; chapitres 1–2 exécutables partout, 3–4 dépendent de la cible |
 | C10 image `mkifs` reproductible + scripts QEMU | `mkifs` puis boot, deux fois de suite, même empreinte | non vérifié |
 
 Les niveaux X (X1–X5) ne sont pas des exigences prouvables au 15/12 : X1 est

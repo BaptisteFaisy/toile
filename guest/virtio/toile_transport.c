@@ -166,12 +166,66 @@ void toile_tr_close(toile_transport *tr)
 
 /* --- init / introspection ------------------------------------------------- */
 
+/* Virtio 1.2 §3.1 status sequence, driven HERE and not through
+ * pgw_vio_init_device().  That helper starts with pgw_vio_reset(), and on
+ * QNX the reset hook the backend installs (qnx_pci_teardown, wired as
+ * dev->irq_release) DETACHES the PCI device and unmaps its BARs: the
+ * device is dead before the first feature word can be read.  Driving the
+ * status byte directly keeps the device attached for the whole session;
+ * the detach happens once, in pgw_vio_destroy(). */
+static int tr_status(pgw_vio_dev *dev, uint8_t want, uint8_t bit)
+{
+    dev->ops->set_status(dev, want);
+    if ((dev->ops->get_status(dev) & bit) == 0u)
+        return TOILE_TR_EIO;
+    return TOILE_TR_OK;
+}
+
 int toile_tr_init(toile_transport *tr, uint64_t driver_features)
 {
     if (tr == NULL)
         return TOILE_TR_EINVAL;
-    return tr_map(pgw_vio_init_device(tr->dev,
-                                      driver_features | PGW_VIO_F_VERSION_1));
+    pgw_vio_dev *dev = tr->dev;
+    uint64_t want = driver_features | PGW_VIO_F_VERSION_1;
+
+    int rc = tr_status(dev, PGW_VIO_STATUS_ACK, PGW_VIO_STATUS_ACK);
+    if (rc != TOILE_TR_OK)
+        return rc;
+    rc = tr_status(dev, (uint8_t)(PGW_VIO_STATUS_ACK | PGW_VIO_STATUS_DRIVER),
+                   PGW_VIO_STATUS_DRIVER);
+    if (rc != TOILE_TR_OK)
+        return rc;
+
+    uint64_t host = dev->ops->get_features(dev);
+    if ((want & ~host) != 0u) {
+        dev->ops->set_status(dev, (uint8_t)(PGW_VIO_STATUS_ACK |
+                                            PGW_VIO_STATUS_DRIVER |
+                                            PGW_VIO_STATUS_FEATURES |
+                                            PGW_VIO_STATUS_FAILED));
+        return TOILE_TR_EIO;
+    }
+    uint64_t negotiated = want & host;
+    dev->ops->set_features(dev, negotiated);
+    rc = tr_status(dev, (uint8_t)(PGW_VIO_STATUS_ACK | PGW_VIO_STATUS_DRIVER |
+                                  PGW_VIO_STATUS_FEATURES),
+                   PGW_VIO_STATUS_FEATURES);
+    if (rc != TOILE_TR_OK)
+        return rc;
+    pgw_vio_info *info = pgw_vio_info_mut(dev);
+    if (info != NULL)
+        info->negotiated_features = negotiated;
+    return TOILE_TR_OK;
+}
+
+int toile_tr_ready(toile_transport *tr)
+{
+    if (tr == NULL)
+        return TOILE_TR_EINVAL;
+    pgw_vio_dev *dev = tr->dev;
+    return tr_status(dev, (uint8_t)(PGW_VIO_STATUS_ACK | PGW_VIO_STATUS_DRIVER |
+                                     PGW_VIO_STATUS_FEATURES |
+                                     PGW_VIO_STATUS_DRIVER_OK),
+                      PGW_VIO_STATUS_DRIVER_OK);
 }
 
 uint16_t toile_tr_queue_count(const toile_transport *tr)

@@ -16,6 +16,11 @@
 #                                   pci_match_tag() skips tag for non-fs
 #   - virtio/src/mmio.c           : MMIO discovery accepts type 16,
 #                                   match_tag() skips tag for non-fs
+#   - virtio/src/pci_caps.c       : the capability walk only reads the
+#                                   "length" byte of a VENDOR capability;
+#                                   a real virtio-gpu-pci also exposes an
+#                                   MSI-X capability (0x11) whose byte +2
+#                                   is the table size, not a length.
 # Apply with:  patch -p1 -d <passerelle-copy-root> < this-file
 diff -ruN a/common/include/pgw/limits.h b/common/include/pgw/limits.h
 --- a/common/include/pgw/limits.h	2026-11-11 00:25:35.806879635 +0100
@@ -151,3 +156,42 @@ diff -ruN a/virtio/src/qnx_mem.c b/virtio/src/qnx_mem.c
          PGW_ERR("virtio: ring memory is not physically contiguous");
          munmap(p, len);
          return NULL;
+diff -ruN a/virtio/src/pci_caps.c b/virtio/src/pci_caps.c
+--- a/virtio/src/pci_caps.c	2026-11-12 00:25:35.806879635 +0100
++++ b/virtio/src/pci_caps.c	2026-11-12 20:43:01.766299490 +0100
+@@ -139,19 +139,26 @@
+         }
+         uint8_t cap_id = rd8(r, ptr);
+         uint8_t next = rd8(r, (uint16_t)(ptr + 1u));
+-        uint8_t cap_len = rd8(r, (uint16_t)(ptr + 2u));
+         if (r->fail)
+             return PGW_EIO;
+-        if (cap_len < PGW_PCI_CAP_MIN_LEN) {
+-            PGW_ERR("virtio-pci: capability 0x%02x has length %u",
+-                    (unsigned)cap_id, (unsigned)cap_len);
+-            return PGW_EIO;
+-        }
+-        if (cap_id == PGW_PCI_CAP_ID_VENDOR)
++        if (cap_id == PGW_PCI_CAP_ID_VENDOR) {
++            /* Only the vendor capability carries a length at +2 (virtio 1.2
++             * §4.1.4.1).  Other capabilities (MSI-X 0x11, PCIe 0x10) hold
++             * their control register there: treating it as a length rejects a
++             * healthy MSI-X capability (its byte +2 is the table size). */
++            uint8_t cap_len = rd8(r, (uint16_t)(ptr + 2u));
++            if (r->fail)
++                return PGW_EIO;
++            if (cap_len < PGW_PCI_CAP_MIN_LEN) {
++                PGW_ERR("virtio-pci: capability 0x%02x has length %u",
++                        (unsigned)cap_id, (unsigned)cap_len);
++                return PGW_EIO;
++            }
+             read_vendor_cap(r, ptr, cap_len, out);
+-        else if (cap_id == PGW_PCI_CAP_ID_MSIX &&
+-                 cap_len >= PGW_PCI_CAP_MSIX_LEN && out->msix_off == 0u)
++        } else if (cap_id == PGW_PCI_CAP_ID_MSIX && out->msix_off == 0u) {
++            /* MSI-X has an implicit 12-byte size, no length field. */
+             out->msix_off = ptr;
++        }
+         if (r->fail)
+             return PGW_EIO;
+         ptr = next;

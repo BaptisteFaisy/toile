@@ -1,0 +1,159 @@
+# Toile — image/toile-driver.build
+#
+# Image QNX invitée qui charge le pilote invité Toile (guest/gpu/ +
+# guest/virtio/ + guest/common/, binaire `toile-gpu`) dans un invité QNX 8.0
+# et le fait énumérer le périphérique virtio-gpu, puis créer /dev/gpu0.
+# C'est la preuve « le pilote invité démarre dans l'invité » (essai driver,
+# phase 1 du socle S6).
+#
+# Différence avec image/toile-e1.build : l'image de sonde E1 ne contenait
+# que la mécanique PCI (pci-tool).  Celle-ci contient EN PLUS le binaire
+# `toile-gpu` produit par guest/common.mk, et le lance au démarrage.
+# Pas de Screen, pas de disque, pas de démo : le pilote seul, sur la ligne
+# série.
+#
+# Construction (SDP QNX 8.0 installé) :
+#   source ~/qnx800/qnxsdp-env.sh
+#   make -f guest/common.mk driver            # produit guest/build/toile-gpu
+#   mkifs image/toile-driver.build /tmp/toile-driver.ifs
+#
+# Lancement (hôte QEMU) :
+#   qemu-system-x86_64 --enable-kvm --cpu host -m 1536 \
+#       -kernel /tmp/toile-driver.ifs -vga none -device virtio-gpu-pci \
+#       -display none -serial file:/tmp/toile-driver-serial.log -monitor none
+#
+# Le pilote (et la script de démarrage) écrivent entre les marqueurs
+# === TOILE_DRIVER_PROBE_BEGIN === et === TOILE_DRIVER_PROBE_END ===, sur la
+# console série : la ligne « TOILE: virtio-gpu trouve (1af4/1050) sur
+# Bxxx:Dxx:Fxx », puis « TOILE: /dev/gpu0 pret », ou « TOILE: ECHEC <raison> ».
+# `waitfor /dev/gpu0` confirme la publication du noeud par le resmgr depuis un
+# second processus.
+
+[search=${QNX_TARGET}/x86_64/boot/sys:${QNX_TARGET}/x86_64/bin:${QNX_TARGET}/x86_64/sbin:${QNX_TARGET}/x86_64/usr/bin:${QNX_TARGET}/x86_64/usr/sbin:${QNX_TARGET}/x86_64/usr/lib:${QNX_TARGET}/x86_64/lib:${QNX_TARGET}/x86_64/lib/dll/pci:guest/build]
+
+[virtual=x86_64,multiboot] boot = {
+    startup-x86 -D8250..115200
+    PATH=/proc/boot
+    LD_LIBRARY_PATH=/proc/boot
+    [+keeplinked] procnto-smp-instr -mr -d 022 -u 066
+}
+
+[+script] startup-script = {
+    TERM=qansi
+    HOME=/proc/boot
+    PCI_BKWD_COMPAT_MODULE=/proc/boot/pci_bkwd_compat.so
+    PCI_SLOG_MODULE=pci_slog2.so
+    PCI_DEBUG_MODULE=pci_debug2.so
+    PCI_CAP_MODULE_DIR=/proc/boot
+    devc-ser8250 -e
+    pci-server --aspace-enable --config=/proc/boot/pci_server.cfg
+    waitfor /dev/pci/server_id_1
+    # La startup-script n'a pas d'integrateur `echo` : le script de sonde
+    # est donc lance par ksh (builtin echo disponible).
+    ksh /proc/boot/probe.sh
+    on -d -t /dev/ser1 ksh -l
+}
+
+# --- configuration du serveur PCI ------------------------------------------
+# Contenu repris de l'image QNX Everywhere (QSTI) installée dans le SDP :
+# output/build/ifs.build de ~/qnx800/images/qemu (relu le 2026-11-12).
+[type=file] /proc/boot/pci_server.cfg = {
+    [buscfg]
+    DO_BUS_CONFIG=no
+
+    [envars]
+    PCI_DEBUG_MODULE=pci_debug2.so
+    PCI_HW_MODULE=pci_hw-Intel_x86.so
+    PCI_HW_CONFIG_FILE=/proc/boot/pci_hw.cfg
+}
+
+[type=file] /proc/boot/pci_hw.cfg = {
+    [interrupts]
+    B0:D17:F0    A    18
+    B0:D17:F0    B    19
+    B0:D17:F0    C    16
+    B0:D17:F0    D    17
+    B3:D0:F0     A    18
+    B3:D0:F0     B    19
+    B3:D0:F0     C    16
+    B3:D0:F0     D    17
+}
+
+# --- binaires ------------------------------------------------------------
+ksh
+on
+waitfor
+devc-ser8250
+pci-server
+pci-tool
+devinfo
+pidin
+# Le pilote invité Toile (produit par guest/common.mk, cherché via le
+# path de recherche « guest/build » ci-dessus — lancer mkifs depuis la
+# racine du dépôt).  +x explicite : lancé par la startup-script, il doit
+# être exécutable (uid/gid 0 = root, lancé par procnto au démarrage).
+[+keeplinked perms=0755 uid=0 gid=0] toile-gpu
+# Client de preuve : ouvre /dev/gpu0 depuis l'invité et interroge le
+# pilote (devctl).  C'est le témoin indépendant que le noeud existe.
+[+keeplinked perms=0755 uid=0 gid=0] toile-gpu-probe
+
+# --- modules PCI ----------------------------------------------------------
+pci_bkwd_compat.so
+pci_slog2.so
+pci_debug2.so
+pci_hw-Intel_x86.so
+pci_cap-0x01.so
+pci_cap-0x04.so
+pci_cap-0x05.so
+pci_cap-0x07.so
+pci_cap-0x09-ffffffff.so
+pci_cap-0x0d.so
+pci_cap-0x10.so
+pci_cap-0x10-16c3abcd.so
+pci_cap-0x10-19570400.so
+pci_cap-0x11.so
+pci_cap-0x11-ffffffff.so
+pci_cap-0x12.so
+pci_cap-0x13.so
+pcie_xcap-0x0001.so
+pcie_xcap-0x0003.so
+pcie_xcap-0x000b-ffffffff.so
+pcie_xcap-0x0015.so
+
+# --- bibliothèques partagées (ELIBACC 83 sinon) ---------------------------
+# NEEDED relevé avec readelf -d sur les binaires ci-dessus
+# (toile-gpu : libpci.so.3.0, libc.so.6, libgcc_s.so.1 + ldqnx-64.so.2).
+ldqnx-64.so.2
+libc.so.6
+libgcc_s.so.1
+libsecpol.so.1
+libpci.so.3.0
+libsocket.so.4
+
+[type=link] /usr/lib/ldqnx-64.so.2=/proc/boot/ldqnx-64.so.2
+[type=link] /lib/libc.so.6=/proc/boot/libc.so.6
+[type=link] /lib/libgcc_s.so.1=/proc/boot/libgcc_s.so.1
+[type=link] /lib/libsecpol.so.1=/proc/boot/libsecpol.so.1
+[type=link] /lib/libpci.so.3.0=/proc/boot/libpci.so.3.0
+[type=link] /lib/libsocket.so.4=/proc/boot/libsocket.so.4
+
+# --- script de sonde --------------------------------------------------------
+# Lancé par ksh depuis la startup-script : ksh a l'integrateur `echo`,
+# la startup-script non.
+#
+# Le client `toile-gpu-probe` ouvre /dev/gpu0 comme un client ordinaire :
+# c'est la preuve que le noeud existe dans l'espace de noms du noyau et que
+# le resource manager répond (et non seulement que le pilote l'a annoncé).
+[type=file] /proc/boot/probe.sh = {
+    #!/bin/ksh
+    echo "=== TOILE_DRIVER_PROBE_BEGIN ==="
+    /proc/boot/toile-gpu &
+    # Le client réessaie l'ouverture pendant ~20 s : il n'y a ni binaire
+    # `sleep` ni builtin `sleep` dans l'invité minimal.
+    echo "--- client /dev/gpu0 ---"
+    /proc/boot/toile-gpu-probe
+    echo "client rc=$?"
+    echo "--- pidin ---"
+    pidin
+    echo "=== TOILE_DRIVER_PROBE_END ==="
+}

@@ -2,7 +2,7 @@
 /*
  * Toile — S7 demo: one framebuffer, one head, static test pattern.
  *
- * Two paths, both real:
+ * Three paths:
  *
  *   --screen  (default) Screen CLIENT path: a window is created in the
  *             running Screen server and the test pattern is painted into
@@ -24,17 +24,20 @@
  *             virtio-gpu framebuffer through /dev/gpu0 (devctl); the
  *             pattern is painted directly into it and pushed to the host.
  *             This is the documented fallback of the cahier des charges
- *             §12 (E2) when Screen cannot host a third-party driver.
+ *             §12 (decision D18) when Screen cannot host a third-party
+ *             driver.
  *
- * IMPORTANT : this file is NOT a QNX display driver.  The QNX 8.0
- * display-driver interface could not be verified on this machine (no
- * display-driver DDK in the installed SDP).
- * // E2: à confirmer — le contrat d'écriture d'un display driver tiers
- * // E2: à confirmer — (points d'entrée, ABI du module, découverte par le
- * // E2: à confirmer — serveur drm-*) n'est PAS documenté dans le SDP
- * // E2: à confirmer — installé : le squelette guest/display/toile_dispskel.c
- * // E2: à confirmer — liste les points ouverts, et le mode de repli livré
- * // E2: à confirmer — est le chemin /dev/gpu0 (mode --fb ci-dessous).
+ *   --wfd     WFD path (E2): a third-party display driver for Screen in
+ *             QNX 8.0 is an OpenWF Display (WFD) driver, not an
+ *             « io-display » one.  This path opens a WFD session and
+ *             binds the Toile pipeline.  E2: it cannot run on this
+ *             machine — wfd-server, libWFDplatform and libwfdcfg.so are
+ *             absent from the installed SDP, so wfdEnumerateDevices()
+ *             returns 0 devices.  The failure is reported, not hidden.
+ *
+ * IMPORTANT : this file is NOT a QNX display driver.  It is a demo
+ * client.  The display-driver contract itself lives in
+ * guest/display/toile_dispskel.c, against the real WFD/Wfdcfg API.
  */
 #include <screen/screen.h>
 
@@ -55,7 +58,7 @@
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [--screen|--fb] [--width N] [--height N] [--e2]\n",
+            "usage: %s [--screen|--fb|--wfd] [--width N] [--height N] [--e2]\n",
             argv0);
 }
 
@@ -155,17 +158,46 @@ static int run_screen_mire(int width, int height)
         sleep(60);
 }
 
+/* --- chemin WFD (OpenWF Display) ------------------------------------------ */
+/* E2 : ouvre une session WFD et lie le pipeline Toile.
+ * Sur cette machine, wfdEnumerateDevices() rend 0 appareil (ni
+ * wfd-server, ni libWFDplatform dans le SDP) : l'echec est signale. */
+static int run_wfd_mire(int width, int height)
+{
+    toile_dispskel_t s;
+    int rc;
+
+    if (toile_dispskel_open(&s) != 0) {
+        fprintf(stderr,
+                "toile-display: aucune session WFD (wfd-server absent du SDP)\n");
+        fprintf(stderr, "toile-display: E2 — wfd-server, libWFDplatform et "
+                        "libwfdcfg.so manquent ; repli : --fb\n");
+        return 1;
+    }
+    printf("toile-display: session WFD ouverte (device %d, %d port(s))\n",
+           (int)s.device_id, (int)s.port_count);
+    rc = toile_dispskel_bind_pipeline(&s, 0, (WFDint)width, (WFDint)height);
+    if (rc != 0)
+        fprintf(stderr, "toile-display: bind du pipeline WFD a échoué\n");
+    else
+        printf("toile-display: pipeline WFD lié (commit effectué)\n");
+    toile_dispskel_close(&s);
+    return rc == 0 ? 0 : 1;
+}
+
 int main(int argc, char **argv)
 {
     int width = DEMO_DEFAULT_W;
     int height = DEMO_DEFAULT_H;
-    int use_fb = 0;
+    int mode = 0; /* 0 = screen, 1 = fb, 2 = wfd */
     int show_e2 = 0;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screen") == 0)
-            use_fb = 0;
+            mode = 0;
         else if (strcmp(argv[i], "--fb") == 0)
-            use_fb = 1;
+            mode = 1;
+        else if (strcmp(argv[i], "--wfd") == 0)
+            mode = 2;
         else if (strcmp(argv[i], "--e2") == 0)
             show_e2 = 1;
         else if (strcmp(argv[i], "--width") == 0 && i + 1 < argc)
@@ -181,7 +213,9 @@ int main(int argc, char **argv)
         toile_dispskel_report();
         return EXIT_SUCCESS;
     }
-    int rc = use_fb ? run_fb_mire(width, height)
-                     : run_screen_mire(width, height);
-    return rc == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (mode == 1)
+        return run_fb_mire(width, height) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (mode == 2)
+        return run_wfd_mire(width, height) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return run_screen_mire(width, height) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

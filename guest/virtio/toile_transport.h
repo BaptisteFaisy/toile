@@ -36,6 +36,7 @@ extern "C" {
 /* virtio-gpu device identity (OASIS virtio 1.x §5.7, PCI modern base). */
 #define TOILE_VIRTIO_ID_GPU      16u
 #define TOILE_VIRTIO_GPU_PCI_DID 0x1050u /* 0x1040 + 16 */
+#define TOILE_VIRTIO_PCI_VENDOR  0x1af4u /* Red Hat, virtio */
 
 /* virtio-gpu queue indices (OASIS virtio 1.x §5.7.2). */
 #define TOILE_VQ_CONTROLQ 0u
@@ -75,10 +76,18 @@ toile_transport *toile_tr_open_pci(uint16_t virtio_device_id,
  * the layer can be exercised on a PC (mirrors Passerelle VIO-10). */
 toile_transport *toile_tr_open_mock(uint16_t num_queues);
 
-/* Negotiate features and move the device to DRIVER_OK.  Pass the OR of
+/* Negotiate features and move the device to FEATURES_OK.  Pass the OR of
  * the feature bits the driver needs; transport-level VERSION_1 is added
- * automatically.  0 on success. */
+ * automatically.  0 on success.
+ *
+ * The device is left in the FEATURES_OK state: the virtqueues must be
+ * created before DRIVER_OK is set (virtio 1.2 §3.1.4.2), which is what
+ * toile_tr_ready() is for. */
 int toile_tr_init(toile_transport *tr, uint64_t driver_features);
+
+/* Set DRIVER_OK: the device starts serving the virtqueues.  Call it once
+ * every virtqueue has been created.  0 on success. */
+int toile_tr_ready(toile_transport *tr);
 
 void toile_tr_close(toile_transport *tr);
 
