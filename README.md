@@ -80,9 +80,37 @@ de sévérité `error`, `2` usage ou fixture invalide, `3` divergence avec
 `--expect`. Cibles disponibles : `build`, `test-c`, `test-py`, `diff`, `golden`,
 `guards`, `test`, `qemu-demo`, `clean` (`CONTRACT.md` §12).
 
-> **Honnêteté sur la commande n°1.** Au 2026-11-12 le `Makefile` et les fixtures
-> ne sont pas encore dans l'arbre : ils arrivent avec les lots L1–L3. Ce qui est
-> écrit et vérifiable aujourd'hui est listé dans la section suivante.
+## Dans l'émulateur (QEMU)
+
+Toile est la **moitié invitée** de la boucle. La moitié hôte est déjà là :
+QEMU fournit le périphérique standard `virtio-gpu-pci`. Les deux ensemble :
+
+```
+invité QNX (pilote Toile)                 hôte QEMU (périphérique virtio-gpu)
+  énumération PCI 1af4/1050  ──────────▶  device présent
+  GET_DISPLAY_INFO ─────────────────────▶  scanout 0, 1280×800 activé
+  RESOURCE_CREATE_2D + backing ──────────▶  ressource enregistrée
+  SET_SCANOUT ───────────────────────────▶  surface sélectionnée pour l'affichage
+  paint + flush ─────────────────────────▶  la fenêtre de l'émulateur affiche
+  TRANSFER_FROM_HOST (0x0206) ◀──────────  relecture (preuve numérique)
+```
+
+**Une seule commande** pour voir la boucle :
+
+```bash
+./qemu/run-demo.sh      # compile, démarre QEMU, fait peindre la mire depuis l'invité,
+                        # capture l'affichage, affiche le verdict
+```
+
+Variantes testables : `TOILE_VARIANT=virtio-vga` (classe VGA), `TOILE_VARIANT=virtio-gpu-device`
+(MMIO, sans PCI), `TOILE_DISPLAY=vnc` pour une fenêtre VNC, `TOILE_SDP=~/qnx800` pour le SDP.
+
+**Déjà vérifié dans un invité QNX 8.0 réel** (`qemu/probe-driver.sh`, exit 0) : le pilote trouve
+le périphérique virtio-gpu, **reçoit** `GET_DISPLAY_INFO`, **fait accepter**
+`RESOURCE_CREATE_2D` + backing + `SET_SCANOUT`, et publie `/dev/gpu0`. Reste ouvert : l'ouverture
+de `/dev/gpu0` par un client plante dans la bibliothèque resmgr de QNX 8.0 (avant tout handler
+Toile) — c'est le dernier obstacle du côté invité, et il est détaillé dans
+[`docs/TRIALS-E1-E6.md`](docs/TRIALS-E1-E6.md).
 
 ## Arborescence du dépôt
 
@@ -126,30 +154,33 @@ débutant), [`docs/GAP.md`](docs/GAP.md) (les trous visés et leur statut),
 
 ## État d'avancement (honnête)
 
-Statut au **2026-11-12**. Le socle S est **en cours** ; rien n'est annoncé comme
-prouvé sur cible.
+Statut au **2026-11-12**, après la première journée de construction.
 
 | Ce qui est en place | Preuve |
 |---|---|
-| `CONTRACT.md` gelé (§1–§13) | fichier présent ; toute modification exige une PR touchant le contrat **et** les deux implémentations |
-| API publique C (`core/include/toile/*.h`) | écrite et conforme à `CONTRACT.md` §10 |
-| Adaptation du transport Passerelle (`guest/virtio/`) | `toile_transport.{h,c}` + `toile-virtio-gpu.patch` écrits ; **non compilés sur cible QNX** (essai E3) |
-| Corrections du protocole | en-tête standard `virtio_gpu.h` relu le 2026-11-12 : `TRANSFER_FROM_HOST_2D` et `SET_CURSOR` n'existent pas, `MAX_SCANOUTS` = 16 confirmé (`CONTRACT.md` §9) |
+| `CONTRACT.md` gelé (§1–§13) | toute modification exige une PR touchant le contrat **et** les deux implémentations |
+| Cœur C11 portable + CLI | `make build`, `make test-c` : 4 binaires de test verts |
+| Jumeau Python indépendant | `make test-py` : 31 tests ; `make diff` : 21 fixtures, 63 comparaisons, **0 écart** |
+| Fixtures + oracles | 21 séquences de référence (dont 8 fautives) + 63 goldens |
+| Gardes CI (taille, API gelée) | 0 contrevenant ; 28/28 signatures publiques présentes |
+| CI sur runner self-hosted | `ci` + `ci-budget` verts sur `r630-toile-01` (budget 5 min) |
+| Système d'agent hermes | gate de fraîcheur + résolution de conflits par **InferHub** : **preuve exécutée** sur un conflit de fusion réel |
+| Site du projet | <https://tradoooo.github.io/toile/> |
+| Pilote invité QNX | **démarre dans un invité QNX 8.0 réel** : trouve le `virtio-gpu`, reçoit `GET_DISPLAY_INFO`, fait accepter `RESOURCE_CREATE_2D` + backing + `SET_SCANOUT`, publie `/dev/gpu0` (`qemu/probe-driver.sh`) |
+| Interface display driver Screen | **identifiée** : OpenWF Display (WFD) + Wfdcfg — et **pas** `io-display` (`docs/TRIALS-E1-E4.md` §E2) |
 
-| Ce qui reste à faire | Qui |
+| Ce qui reste à faire | Blocage |
 |---|---|
-| Cœur C11 complet, CLI, jumeau Python, fixtures, différentiel, `Makefile`, gardes CI | lots L1–L3 (en cours d'écriture) |
-| Pilote invité, display driver Screen, image `mkifs`, démo QEMU | lots L5–L7, **bloqués par E1 et E2** |
-| Validation contre QEMU réel (capture/rejeu) | lot L10, exigence C8 |
+| Ouverture de `/dev/gpu0` par un client | SIGSEGV dans la bibliothèque resmgr de QNX 8.0, **avant** tout handler Toile |
+| Intégration Screen (vrai bureau dans la fenêtre) | le BSP Screen (`libWFDplatform`, `wfd-server`, `libwfdcfg.so`) est hors du SDP libre |
+| Débit réel invité → hôte (E5) | pas de chemin d'affichage complet ; le débit du **modèle** est mesuré (`docs/TRIALS-E5.md`) |
+| Volet B (vdev hôte QNX Hypervisor) | E4 négatif : DDK hyperviseur absent du SDP et hors licence |
 
-**Essais non tranchés sur cible** : **E1** (un invité QNX 8.0 énumère-t-il le
-`virtio-gpu-pci` sur son bus PCI ?), **E2** (Screen accepte-t-il un display
-driver tiers, et quel est son contrat exact ?), **E4** (le DDK hyperviseur est-il
-accessible en licence non commerciale ? — ne bloque que le volet B). **E5**
-(performances d'un flush 2D, ≥ 15–20 images/s en 1080p) n'est pas mesuré. Aucun
-de ces cinq essais n'exige de matériel propriétaire, mais tous exigent un SDP QNX
-installé et une VM : ils ne sont donc pas prouvés par ce dépôt. Détail et
-registre complet des statuts : [`docs/GAP.md`](docs/GAP.md) §4–§5.
+**Essais** : **E1** tranché *positif* (exécuté) · **E2** *partiellement* tranché (interface identifiée,
+intégration non testée) · **E3** *partiellement* tranché (transport réutilisé avec un patch) ·
+**E4** tranché *négatif* · **E5** *non tranché* sur cible (modèle mesuré) · **E6** tranché *positif*
+(pilote invité dans un QNX 8.0 réel). Registre complet : [`docs/GAP.md`](docs/GAP.md) §4–§5 et
+[`docs/TRIALS-E1-E6.md`](docs/TRIALS-E1-E6.md).
 
 ## Projet frère : Passerelle
 
