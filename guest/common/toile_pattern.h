@@ -24,6 +24,10 @@ extern "C" {
 /* True when the format stores Blue in byte 0 (BGRA family). */
 int toile_pattern_fmt_is_bgra(uint32_t fmt);
 
+/* Pack one RGB triplet into a pixel word for `fmt` (byte order follows the
+ * format family above).  Shared by the mire and the animated painter. */
+uint32_t toile_pattern_pack(uint32_t fmt, uint32_t r, uint32_t g, uint32_t b);
+
 /* Paint the static test pattern into a pixel buffer.
  * `pixels`  : framebuffer base (32-bit pixels)
  * `stride`  : bytes per line

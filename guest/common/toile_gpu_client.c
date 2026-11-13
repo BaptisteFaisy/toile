@@ -43,9 +43,10 @@ void *toile_gpu_mmap(int fd, const toile_gpu_fb_t *fb, size_t *len)
 {
     if (fd < 0 || fb == NULL || fb->paddr == 0 || fb->bytes == 0)
         return NULL;
+    /* MAP_PHYS : le descripteur doit être NOFD et l'offset porte l'adresse
+     * physique (mmap(2) QNX 8.0 ; passer `fd` échoue avec EINVAL). */
     void *p = mmap(NULL, (size_t)fb->bytes, PROT_READ | PROT_WRITE,
-                   MAP_PHYS | MAP_SHARED, (int)(uintptr_t)fd,
-                   (off64_t)fb->paddr);
+                   MAP_PHYS | MAP_SHARED, NOFD, (off64_t)fb->paddr);
     if (p == MAP_FAILED)
         return NULL;
     if (len != NULL)
