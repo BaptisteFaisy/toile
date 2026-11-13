@@ -10,6 +10,12 @@ QNX-specific Technologies*. Licence [MIT](LICENSE).
 [![ci](https://github.com/Tradoooo/toile/actions/workflows/ci.yml/badge.svg)](https://github.com/Tradoooo/toile/actions/workflows/ci.yml)
 [![ci-budget](https://github.com/Tradoooo/toile/actions/workflows/ci-budget.yml/badge.svg)](https://github.com/Tradoooo/toile/actions/workflows/ci-budget.yml)
 
+![Vitrine live : l'invite QNX 8.0 peint un plasma anime dans l'emulateur](site/gif/toile.gif)
+
+*Vitrine live : trois clients de l'invite peignent le meme framebuffer
+`virtio-gpu` a 30 im/s, l'emulateur affiche le resultat — capture reelle de la
+vitrine ([page Live](https://tradoooo.github.io/toile/emulator-live.html)).*
+
 ---
 
 ## Le problème
