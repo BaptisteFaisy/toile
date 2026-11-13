@@ -20,21 +20,17 @@ name: guest-e2e
 # en 5 minutes (emulation logicielle trop lente).
 
 on:
-  # Declencheurs volontairement restreints : le job a besoin d'un runner avec
-  # /dev/kvm (le depot n'en a aucun enregistre aujourd'hui). Le declencheur
-  # `pull_request` sera ajoute quand le runner `toile-worker` sera enregistre
-  # pour ce depot — sinon la PR resterait « en attente » indefiniment.
-  workflow_dispatch:
-  schedule:
-    # chaque nuit : la preuve C ne doit pas dependre d'une PR recente.
-    - cron: '23 4 * * *'
-  push:
-    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - 'guest/**'
       - 'image/**'
       - 'qemu/**'
       - '.github/workflows/guest-e2e.yml'
+  workflow_dispatch:
+  schedule:
+    # chaque nuit : la preuve C ne doit pas dependre d'une PR recente.
+    - cron: '23 4 * * *'
 
 permissions:
   contents: read
