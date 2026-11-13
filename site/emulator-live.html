@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Toile — live guest (QNX 8.0 in QEMU)</title>
-  <meta name="description" content="Live view of the Toile QNX 8.0 guest: the driver paints through virtio-gpu and the emulator shows it, refreshed in the browser.">
+  <meta name="description" content="Live view of the Toile QNX 8.0 guest: three guest clients paint one shared framebuffer through virtio-gpu, the emulator shows it, and the page reads it live.">
   <link rel="stylesheet" href="assets/style.css">
   <style>
     .live-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:1rem}
@@ -12,9 +12,18 @@
     .panel{background:#0e1016;border:1px solid #262b38;border-radius:8px;overflow:hidden}
     .panel h2{margin:0;padding:.6rem .8rem;font-size:.95rem;background:#151923;border-bottom:1px solid #262b38}
     #live-screen{width:100%;display:block;background:#000}
-    #live-console{height:440px;overflow:auto;font:12px/1.45 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;padding:.6rem;color:#c7e7c0;background:#0a0c12}
+    #live-console{height:380px;overflow:auto;font:12px/1.45 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;padding:.6rem;color:#c7e7c0;background:#0a0c12}
     .meta{color:#8a93a6;padding:.2rem .8rem .6rem;font-size:.8rem}
-    .stale{border-color:#8a5b2a}
+    .btns{display:flex;flex-wrap:wrap;gap:.4rem;padding:.6rem .8rem}
+    button{background:#1b2233;color:#e7e9ee;border:1px solid #38415a;border-radius:6px;padding:.35rem .6rem;cursor:pointer;font:inherit}
+    button:hover{background:#26304a}
+    .statbar{display:flex;flex-wrap:wrap;gap:.5rem;padding:.6rem .8rem;font-size:.8rem;color:#aab3c6}
+    .chip{background:#151923;border:1px solid #262b38;border-radius:999px;padding:.15rem .6rem}
+    .chip b{color:#7fd1c1;font-weight:600}
+    .badge{display:inline-block;padding:.05rem .45rem;border-radius:4px;font-size:.75rem;letter-spacing:.02em}
+    .badge-ok{background:#12352c;color:#7fd1c1;border:1px solid #1d5a49}
+    .badge-warn{background:#3a2a10;color:#e0b872;border:1px solid #6b4a1d}
+    .stale{outline:2px solid #8a5b2a}
   </style>
 </head>
 <body>
@@ -36,14 +45,32 @@
   <h1>Live guest</h1>
   <p class="lede">A QNX 8.0 guest is <strong>really running right now</strong>, on the
   <code>pc</code> host. Inside it, the Toile driver enumerates the <code>virtio-gpu</code>,
-  publishes <code>/dev/gpu0</code>, and a client paints an animated plasma through the device
-  at ~30 frames per second. This page reads that guest live — the screen is re-captured
-  every second, the serial console below is the real boot log.</p>
+  publishes <code>/dev/gpu0</code>, and <strong>three ordinary clients</strong> paint three
+  bands of the same scanout at ~30 frames per second. This page reads that guest live: the
+  screen is a continuous stream, the console below is the real boot log, and the buttons
+  send <strong>real keystrokes</strong> into the guest.</p>
 
   <div class="live-grid">
     <div class="panel">
-      <h2>Guest screen (live screendump)</h2>
-      <img id="live-screen" src="" alt="Live QNX 8.0 guest screen">
+      <h2>Guest screen (continuous stream)</h2>
+      <img id="live-screen" alt="Live QNX 8.0 guest screen">
+      <div class="statbar" id="stats">
+        <span class="chip">guest <b id="s-fps">–</b> im/s</span>
+        <span class="chip">palette <b id="s-pal">–</b></span>
+        <span class="chip">speed <b id="s-speed">–</b></span>
+        <span class="chip">capture <b id="s-cap">–</b> im/s</span>
+        <span class="chip">frame age <b id="s-age">–</b> s</span>
+        <span class="chip" id="s-badge"><span class="badge badge-ok">live</span></span>
+      </div>
+      <div class="btns" id="keys">
+        <button data-k="1">palette 1</button>
+        <button data-k="2">palette 2</button>
+        <button data-k="3">palette 3</button>
+        <button data-k="p">next palette</button>
+        <button data-k="spc">pause / resume</button>
+        <button data-k="minus">slower</button>
+        <button data-k="equal">faster</button>
+      </div>
       <div class="meta" id="screen-meta">connecting…</div>
     </div>
     <div class="panel">
@@ -55,19 +82,25 @@
 
   <h2>What you are looking at</h2>
   <ul>
-    <li>The <strong>moving plasma</strong> is painted by an ordinary client <em>inside</em> the
-    guest (<code>guest/common/toile_anim.c</code>): it opens <code>/dev/gpu0</code>, maps the
-    framebuffer, writes pixels, and pushes every frame with
+    <li>The <strong>moving plasma</strong> is painted by ordinary clients <em>inside</em> the
+    guest (<code>guest/common/toile_anim.c</code>): each opens <code>/dev/gpu0</code>, maps the
+    framebuffer, writes its own band of pixels, and pushes the frame with
     <code>TRANSFER_TO_HOST_2D</code> + <code>RESOURCE_FLUSH</code>. QEMU renders it, and this page
-    re-captures it through the QEMU monitor (<code>screendump</code>) once per second.</li>
-    <li>The <strong>frame counter</strong> (bottom left) and the <strong>FPS</strong> (bottom
-    right) are drawn by the guest, not by this page: if the guest stopped painting, both would
-    freeze.</li>
+    re-captures it through the QEMU monitor (<code>screendump</code>).</li>
+    <li>Three processes (<code>toile-anim --zone 0|1|2 --zones 3</code>) paint three bands of the
+    same scanout, each presenting only its own rectangle: the <strong>wall of three clients</strong>.
+    The frame counter and the FPS are drawn <em>by the guest</em> — if the guest stopped painting,
+    they would freeze.</li>
+    <li>The buttons send <strong>real keystrokes</strong> (<code>sendkey</code> on the QEMU
+    monitor → <code>virtio-input</code> → <code>guest/input/toile_input.c</code> →
+    <code>DCMD_TOILE_GPU_ANIM_SET</code>). The keyboard driver owns the shared animation state;
+    the painters only read it, so every client reacts to the same key.</li>
     <li>The console shows the real boot sequence: <code>TOILE: virtio-gpu trouve (1af4/1050)</code>,
     <code>TOILE: /dev/gpu0 pret</code>, <code>CLIENT: /dev/gpu0 ouvert (fd=3)</code>, then
     <code>ANIM: 151 images, 30.2 im/s, present_ko=0</code>.</li>
-    <li>There is <strong>no keyboard interaction</strong> yet: virtio-input is one of the
-    explicitly-open items — the guest has no input path, so the screen does not react to keys.</li>
+    <li><strong>Proof C</strong>: the guest publishes the FNV-1a hash of its own framebuffer and
+    holds the frame; the host recomputes the hash from the pixels QEMU rendered — identical
+    hashes prove the image you see is the image the guest painted.</li>
   </ul>
 
   <p>Full-screen view with the key-injection console:
@@ -82,7 +115,12 @@
   var sMeta = document.getElementById("screen-meta");
   var con = document.getElementById("live-console");
   var cMeta = document.getElementById("console-meta");
-  var ageStr = "";
+  var badge = document.getElementById("s-badge");
+
+  function setStat(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
 
   function refreshConsole() {
     fetch(BASE + "/console").then(function (r) {
@@ -91,23 +129,56 @@
     }).then(function (t) {
       con.textContent = t;
       con.scrollTop = con.scrollHeight;
-      ageStr = "";
+      cMeta.textContent = "serial console — updated " + new Date().toLocaleTimeString();
     }).catch(function () {
-      ageStr = " (vitrine injoignable)";
       con.textContent = "(console injoignable — la vitrine doit être en ligne)";
+      cMeta.textContent = "vitrine injoignable";
     });
   }
-  function refreshScreen() {
-    var img = new Image();
-    img.onload = function () { scr.src = img.src; sMeta.textContent = "live — " + new Date().toLocaleTimeString(); };
-    img.onerror = function () { sMeta.textContent = "(écran indisponible — la vitrine doit être en ligne)"; };
-    img.src = BASE + "/screen.png?t=" + Date.now();
+
+  function refreshStats() {
+    fetch(BASE + "/stats").then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (s) {
+      setStat("s-fps", s.guest_fps);
+      setStat("s-pal", s.palette);
+      setStat("s-speed", s.speed);
+      setStat("s-cap", s.producer_fps);
+      setStat("s-age", s.frame_age_s);
+      var stale = (s.frame_age_s === null || s.frame_age_s > 6) || !s.invite_connecte;
+      badge.innerHTML = stale
+        ? '<span class="badge badge-warn">restarting…</span>'
+        : '<span class="badge badge-ok">live</span>';
+      scr.classList.toggle("stale", stale);
+      sMeta.textContent = stale
+        ? "the guest is restarting — the last valid frame is still shown"
+        : "live — " + new Date().toLocaleTimeString();
+    }).catch(function () {
+      badge.innerHTML = '<span class="badge badge-warn">vitrine injoignable</span>';
+    });
   }
 
+  /* Flux multipart : une balise <img> suffit, aucun JavaScript de décodage.
+   * Le navigateur redemande le flux si la connexion se coupe. */
+  function startStream() {
+    scr.src = BASE + "/stream";
+  }
+  scr.addEventListener("error", function () { setTimeout(startStream, 2000); });
+
+  document.querySelectorAll("#keys button").forEach(function (b) {
+    b.onclick = function () {
+      fetch(BASE + "/key?k=" + encodeURIComponent(b.dataset.k)).then(function () {
+        setTimeout(refreshStats, 400);
+      });
+    };
+  });
+
   refreshConsole();
-  refreshScreen();
+  refreshStats();
+  startStream();
   setInterval(refreshConsole, 2000);
-  setInterval(refreshScreen, 1000);
+  setInterval(refreshStats, 2000);
 </script>
 <script src="assets/site.js"></script>
 </body>
