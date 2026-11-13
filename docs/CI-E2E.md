@@ -23,9 +23,18 @@ qemu/publish-ifs.sh --tag guest-ifs-20261113 \
   --allow-new-tag --allow-branch
 ```
 
-Le script compile `anim`, `driver`, `probe` et `input`, exécute `mkifs` avec
-`image/toile-vitrine.build`, puis crée ou met à jour l'asset nommé
-`toile-guest.ifs`. `--dry-run` construit l'image sans publier :
+Le script compile `anim`, `driver`, `probe` et `input`, puis construit **deux**
+images :
+
+- `image/toile-vitrine.build` → asset `toile-guest.ifs` (la vitrine : trois
+  clients qui peignent, à lancer à la main) ;
+- `image/toile-verify.build` → asset `toile-verify.ifs` (la **preuve** : son
+  client publie l'empreinte FNV-1a de son framebuffer et tient l'image).
+
+C'est `toile-verify.ifs` que la CI télécharge : l'image de vitrine ne publie
+aucune empreinte, il n'y aurait rien à comparer.
+
+`--dry-run` construit l'image sans publier :
 
 ```bash
 qemu/publish-ifs.sh --tag guest-ifs-latest --allow-branch --dry-run

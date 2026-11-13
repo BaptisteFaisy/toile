@@ -30,6 +30,7 @@ DRY_RUN=0
 ALLOW_NEW_TAG=0
 ALLOW_BRANCH=0
 ASSET_NAME="toile-guest.ifs"
+VERIFY_ASSET_NAME="toile-verify.ifs"
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -79,6 +80,14 @@ mkifs "$IFS_BUILD" "$IFS_BIN" >/dev/null
 SIZE=$(stat -c %s "$IFS_BIN")
 echo "publish-ifs: image $IFS_BIN ($SIZE octets)"
 
+# Deuxieme image : celle de la PREUVE C. Son client publie l empreinte FNV-1a
+# de son framebuffer et tient l image ; sans elle, la CI n a rien a comparer.
+VERIFY_BUILD="image/toile-verify.build"
+VERIFY_BIN="$WORK/$VERIFY_ASSET_NAME"
+echo "publish-ifs: mkifs $VERIFY_BUILD"
+mkifs "$VERIFY_BUILD" "$VERIFY_BIN" >/dev/null
+echo "publish-ifs: image $VERIFY_BIN ($(stat -c %s "$VERIFY_BIN") octets)"
+
 if [ "$DRY_RUN" -eq 1 ]; then
     echo "publish-ifs: dry-run, rien n'est publie"
     exit 0
@@ -91,15 +100,17 @@ if [ "$ALLOW_NEW_TAG" -eq 1 ]; then
     git tag -a "$TAG" -m "Image invitee Toile $TAG" && git push origin "refs/tags/$TAG"
 fi
 
+NOTES="Image IFS de l'invite QNX 8.0 (pilote virtio-gpu, client anime, clavier virtio-input), construite sur le poste de travail avec le SDP QNX 8.0. Deux assets : $ASSET_NAME (image de vitrine) et $VERIFY_ASSET_NAME (image de preuve C : son client publie l empreinte FNV-1a de son framebuffer, la CI la compare a l empreinte recalculee sur les pixels rendus par QEMU)."
+
 if gh release view "$TAG" >/dev/null 2>&1; then
     echo "publish-ifs: mise a jour de la release $TAG"
-    gh release upload "$TAG" "$IFS_BIN" --clobber
+    gh release upload "$TAG" "$IFS_BIN" "$VERIFY_BIN" --clobber
 else
     echo "publish-ifs: creation de la release $TAG"
-    gh release create "$TAG" "$IFS_BIN" \
+    gh release create "$TAG" "$IFS_BIN" "$VERIFY_BIN" \
         --title "Toile guest image $TAG" \
-        --notes "Image IFS de l'invite QNX 8.0 (pilote virtio-gpu + client anime + clavier virtio-input). Construite sur le poste de travail avec le SDP QNX 8.0. La CI de bout en bout telecharge cet asset et rejoue la preuve C."
+        --notes "$NOTES"
 fi
 
-URL=$(gh release view "$TAG" --json assets --jq '.assets[] | select(.name=="'"$ASSET_NAME"'") | .url')
+URL=$(gh release view "$TAG" --json assets --jq '.assets[] | select(.name=="'"$VERIFY_ASSET_NAME"'") | .url')
 echo "publish-ifs: publie -> $URL"
