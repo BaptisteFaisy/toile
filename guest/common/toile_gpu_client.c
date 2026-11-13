@@ -72,3 +72,19 @@ int toile_gpu_mire(int fd)
         return EINVAL;
     return devctl(fd, DCMD_TOILE_GPU_MIRE, &status, sizeof(status), NULL);
 }
+
+int toile_gpu_anim_get(int fd, toile_anim_cfg_t *out)
+{
+    if (fd < 0 || out == NULL)
+        return EINVAL;
+    return devctl(fd, DCMD_TOILE_GPU_ANIM_GET, out, sizeof(*out), NULL);
+}
+
+int toile_gpu_anim_set(int fd, const toile_anim_cfg_t *cfg)
+{
+    toile_anim_cfg_t local;
+    if (fd < 0 || cfg == NULL)
+        return EINVAL;
+    local = *cfg; /* devctl prend un tampon non const */
+    return devctl(fd, DCMD_TOILE_GPU_ANIM_SET, &local, sizeof(local), NULL);
+}

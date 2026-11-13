@@ -41,6 +41,11 @@ int toile_gpu_present(int fd, const toile_gpu_rect_t *rect);
  * it.  0 on success. */
 int toile_gpu_mire(int fd);
 
+/* Animation state shared through the driver (DCMD_TOILE_GPU_ANIM_GET/SET).
+ * 0 on success. */
+int toile_gpu_anim_get(int fd, toile_anim_cfg_t *out);
+int toile_gpu_anim_set(int fd, const toile_anim_cfg_t *cfg);
+
 #ifdef __cplusplus
 }
 #endif

@@ -10,6 +10,11 @@
 #   - `-kernel <ifs>` : l'IFS se lance par le noyau, PAS par le disque ;
 #   - `-vga none -device virtio-gpu-pci` : l'invité doit voir le
 #     périphérique virtio-gpu (1af4/1050), c'est lui que Toile pilote ;
+#   - `-device virtio-keyboard-pci` : le clavier de la vitrine (les touches
+#     envoyées par `sendkey` arrivent dans l'invité, qui pilote l'état
+#     d'animation partagé via devctl) ;
+#   - `-smp <n>` : le nombre de cœurs de l'invité (les trois clients de la
+#     vitrine tournent en parallèle) ;
 #   - `-vnc :N` : l'affichage du device virtio-gpu ; sans lui, `screendump`
 #     ne rend pas la mire ;
 #   - `-monitor unix:<sock>` : la commande HMP `screendump` ;
@@ -17,7 +22,7 @@
 #
 # Usage :
 #   qemu/toile-vitrine.sh --ifs <ifs.bin> --serie <log> --moniteur <sock> \
-#                          [--vnc 12] [--memoire 1536]
+#                          [--vnc 12] [--memoire 1536] [--smp 4] [--sans-clavier]
 #
 # Le script reste au premier plan (exec) : c'est systemd qui le supervise.
 set -u
@@ -27,16 +32,20 @@ SERIE=""
 MON=""
 VNC_NUM=12
 MEM=1536
+SMP=4
+CLAVIER=1
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --ifs)      IFS_BIN="$2"; shift 2 ;;
-        --serie)    SERIE="$2"; shift 2 ;;
-        --moniteur) MON="$2"; shift 2 ;;
-        --vnc)      VNC_NUM="$2"; shift 2 ;;
-        --memoire)  MEM="$2"; shift 2 ;;
-        --aide|-h)  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-        *)          echo "toile-vitrine: argument inconnu : $1" >&2; exit 2 ;;
+        --ifs)           IFS_BIN="$2"; shift 2 ;;
+        --serie)         SERIE="$2"; shift 2 ;;
+        --moniteur)      MON="$2"; shift 2 ;;
+        --vnc)           VNC_NUM="$2"; shift 2 ;;
+        --memoire)       MEM="$2"; shift 2 ;;
+        --smp)           SMP="$2"; shift 2 ;;
+        --sans-clavier)  CLAVIER=0; shift ;;
+        --aide|-h)       sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *)               echo "toile-vitrine: argument inconnu : $1" >&2; exit 2 ;;
     esac
 done
 
@@ -57,12 +66,19 @@ else
     CPU_ARGS=(-cpu max)
 fi
 
-echo "toile-vitrine: IFS=${IFS_BIN} serie=${SERIE} moniteur=${MON} vnc=:${VNC_NUM}"
+DEVICES=(-device virtio-gpu-pci)
+if [ "${CLAVIER}" = "1" ]; then
+    DEVICES+=(-device virtio-keyboard-pci)
+fi
+
+echo "toile-vitrine: IFS=${IFS_BIN} serie=${SERIE} moniteur=${MON} vnc=:${VNC_NUM} smp=${SMP}"
+
 exec "${QEMU}" \
     -m "${MEM}" \
+    -smp "${SMP}" \
     -kernel "${IFS_BIN}" \
     -vga none \
-    -device virtio-gpu-pci \
+    "${DEVICES[@]}" \
     -vnc ":${VNC_NUM}" \
     -serial "file:${SERIE}" \
     -monitor "unix:${MON},server,nowait" \
