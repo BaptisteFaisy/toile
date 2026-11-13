@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — live guest (QNX 8.0 in QEMU)</title>
+  <meta name="description" content="Live view of the Toile QNX 8.0 guest: the driver paints through virtio-gpu and the emulator shows it, refreshed in the browser.">
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .live-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:1rem}
+    @media(max-width:820px){.live-grid{grid-template-columns:1fr}}
+    .panel{background:#0e1016;border:1px solid #262b38;border-radius:8px;overflow:hidden}
+    .panel h2{margin:0;padding:.6rem .8rem;font-size:.95rem;background:#151923;border-bottom:1px solid #262b38}
+    #live-screen{width:100%;display:block;background:#000}
+    #live-console{height:440px;overflow:auto;font:12px/1.45 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;padding:.6rem;color:#c7e7c0;background:#0a0c12}
+    .meta{color:#8a93a6;padding:.2rem .8rem .6rem;font-size:.8rem}
+    .stale{border-color:#8a5b2a}
+  </style>
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="emulator.html">Emulator</a>
+    <a href="emulator-live.html" aria-current="page">Live</a>
+    <a href="trials.html">Trials</a>
+    <a href="contract.html">Contract</a>
+    <a href="codelab.html">Codelab</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Live guest</h1>
+  <p class="lede">A QNX 8.0 guest is <strong>really running right now</strong>, on the
+  <code>pc</code> host. Inside it, the Toile driver enumerates the <code>virtio-gpu</code>,
+  publishes <code>/dev/gpu0</code>, and a client paints the test pattern through the device.
+  This page reads that guest live — the screen is re-captured every two seconds, the serial
+  console below is the real boot log.</p>
+
+  <div class="live-grid">
+    <div class="panel">
+      <h2>Guest screen (live screendump)</h2>
+      <img id="live-screen" src="" alt="Live QNX 8.0 guest screen">
+      <div class="meta" id="screen-meta">connecting…</div>
+    </div>
+    <div class="panel">
+      <h2>Serial console (live)</h2>
+      <pre id="live-console">connecting…</pre>
+      <div class="meta" id="console-meta">connecting…</div>
+    </div>
+  </div>
+
+  <h2>What you are looking at</h2>
+  <ul>
+    <li>The <strong>colour bars, greyscale ramp and 16-px checkerboard</strong> are the Toile test pattern, painted <em>inside</em>
+    the guest (<code>guest/common/toile_pattern.c</code>) and flushed to the <code>virtio-gpu</code>
+    scanout — QEMU renders it, and this page re-captures it via the QEMU monitor
+    (<code>screendump</code>).</li>
+    <li>The console shows the real boot sequence: <code>TOILE: virtio-gpu trouve (1af4/1050)</code>,
+    <code>TOILE: /dev/gpu0 pret</code>, <code>CLIENT: /dev/gpu0 ouvert (fd=3)</code>,
+    <code>CLIENT: mire peinte et presentee</code>.</li>
+    <li>There is <strong>no keyboard interaction</strong> yet: virtio-input is one of the
+    explicitly-open items — the guest has no input path, so the screen does not react to keys.</li>
+  </ul>
+
+  <p>Full-screen view with the key-injection console:
+  <a href="https://baptiste-ms-7d18.tail3a8bdf.ts.net:8443/toile/">vitrine Toile</a>.
+  Proofs and procedure in <a href="https://github.com/Tradoooo/toile/blob/main/docs/TRIALS-E1-E6.md"><code>docs/TRIALS-E1-E6.md</code></a>.</p>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; <a href="https://github.com/Tradoooo/toile">github.com/Tradoooo/toile</a></div></footer>
+<script>
+  var BASE = "https://baptiste-ms-7d18.tail3a8bdf.ts.net:8443/toile";
+  var scr = document.getElementById("live-screen");
+  var sMeta = document.getElementById("screen-meta");
+  var con = document.getElementById("live-console");
+  var cMeta = document.getElementById("console-meta");
+  var ageStr = "";
+
+  function refreshConsole() {
+    fetch(BASE + "/console").then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).then(function (t) {
+      con.textContent = t;
+      con.scrollTop = con.scrollHeight;
+      ageStr = "";
+    }).catch(function () {
+      ageStr = " (vitrine injoignable)";
+      con.textContent = "(console injoignable — la vitrine doit être en ligne)";
+    });
+  }
+  function refreshScreen() {
+    var img = new Image();
+    img.onload = function () { scr.src = img.src; sMeta.textContent = "live — " + new Date().toLocaleTimeString(); };
+    img.onerror = function () { sMeta.textContent = "(écran indisponible — la vitrine doit être en ligne)"; };
+    img.src = BASE + "/screen.png?t=" + Date.now();
+  }
+
+  refreshConsole();
+  refreshScreen();
+  setInterval(refreshConsole, 2000);
+  setInterval(refreshScreen, 2000);
+</script>
+<script src="assets/site.js"></script>
+</body>
+</html>

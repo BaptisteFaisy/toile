@@ -15,6 +15,7 @@
     <a href="index.html">Home</a>
     <a href="architecture.html">Architecture</a>
     <a href="emulator.html" aria-current="page">Emulator</a>
+    <a href="emulator-live.html">Live</a>
     <a href="trials.html">Trials</a>
     <a href="contract.html">Contract</a>
     <a href="codelab.html">Codelab</a>
@@ -55,10 +56,18 @@
   <ul>
     <li><strong>Visual</strong> (done): a screen capture of the QEMU display shows the pattern the guest
     painted — 1280&times;800, six colour bars.</li>
-    <li><strong>Numerical</strong> (pending): the guest paints a known pattern and reads it back through the
-    device (<code>TRANSFER_FROM_HOST</code>, 0x0206); a matching checksum proves the pixels travelled
-    guest &rarr; emulator &rarr; guest. Blocked on opening <code>/dev/gpu0</code> from a client.</li>
+    <li><strong>Client</strong> (done): the node is not only published, it is <em>usable</em> — an ordinary
+    client opens <code>/dev/gpu0</code> (<code>fd=3</code>), queries it with <code>devctl</code>, makes it
+    paint and present. The earlier <code>SIGSEGV</code> was caused by handler tables living on the stack
+    (<code>resmgr_attach()</code> keeps the <em>pointers</em>); they are static now.</li>
+    <li><strong>Numerical readback</strong> (refused by the device): the guest asks for a host&nbsp;&rarr;&nbsp;guest
+    copy (<code>TRANSFER_FROM_HOST</code>, 0x0206) and the device answers <code>0x1200</code>
+    (<code>ERR_UNSPEC</code>) — QEMU's <code>virtio-gpu</code> without virgl implements the 2D series only.
+    The driver says so explicitly rather than pretending; the two checksums match but carry no proof
+    value. A virgl device would be needed.</li>
   </ul>
+  <p><strong>The guest is running live</strong>: <a href="emulator-live.html">live view</a> — screen and
+  serial console of the real QNX 8.0 guest, refreshed in the browser.</p>
   <figure>
     <img src="assets/toile-mire.png" alt="QEMU window showing the Toile test pattern, 1280 by 800, six coloured bars" width="640" height="400">
     <figcaption>The QEMU display after the guest painted the test pattern:
