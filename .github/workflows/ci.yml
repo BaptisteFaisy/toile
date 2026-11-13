@@ -27,7 +27,7 @@ concurrency:
 jobs:
   ci:
     name: ci
-    runs-on: [self-hosted, toile-worker]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout (superficiel)
@@ -35,20 +35,6 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-
-      - name: Préparer PATH (python3, make, outils r630)
-        run: |
-          # Le PATH par défaut du runner (/home/baptiste/.local/bin:/usr/local/
-          # sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin) contient déjà
-          # python3 et make ; on échoue vite avec un message explicite sinon.
-          command -v python3 >/dev/null || { echo "::error::python3 absent du PATH du runner r630-toile-01"; exit 1; }
-          command -v make >/dev/null || { echo "::error::make absent du PATH du runner r630-toile-01"; exit 1; }
-          command -v gcc >/dev/null || { echo "::error::gcc absent du PATH du runner r630-toile-01"; exit 1; }
-          # /home/baptiste/bin (gh, outils maison) N'EST PAS dans le PATH par
-          # défaut : l'ajouter s'il existe (inoffensif pour la CI pure).
-          if [ -d /home/baptiste/bin ]; then
-            echo "/home/baptiste/bin" >> "$GITHUB_PATH"
-          fi
 
       - name: Construction (gcc -std=c11 -O2 -Werror)
         run: make build
