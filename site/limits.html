@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toile — limits</title>
+  <meta name="description" content="What Toile has not proven: no 3D, no 2D host-to-guest readback, an unfinished Screen path, a demo-grade live guest, and the exact boundary between what is measured and what is not.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <span class="brand">Toile</span>
+  <button id="nav-toggle" aria-expanded="false" aria-controls="nav">menu</button>
+  <nav id="nav" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="emulator.html">Emulator</a>
+    <a href="emulator-live.html">Live</a>
+    <a href="trials.html">Trials</a>
+    <a href="contract.html">Contract</a>
+    <a href="codelab.html">Codelab</a>
+    <a href="limits.html" aria-current="page">Limits</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Limits</h1>
+  <p class="lede">This page is the inverse of the other ones: it lists what the project has
+  <strong>not</strong> proven. Every line below comes from a measurement, from a reading of the
+  virtio-gpu standard, or from a source file in this repository. Where a result is missing, it is
+  written as missing. Nothing here is a roadmap item or a promise.</p>
+
+  <div class="promise"><p>The guest paints into the emulator: that part is measured. A full QNX
+  desktop driven by the Screen path: that part is not finished. This page is the distance between
+  the two.</p></div>
+
+  <h2>Proven / Not proven</h2>
+  <table>
+    <tr><th>Proven</th><th>Not proven</th></tr>
+    <tr>
+      <td>The typed API is frozen: 28 public signatures in <code>CONTRACT.md</code> &sect;10, plus
+      the typed <code>devctl</code> of <code>/dev/gpu0</code> (<code>0x50</code>&ndash;<code>0x55</code>).</td>
+      <td><strong>No 3D.</strong> The emulator has no virgl renderer, so the 3D command family is
+      out of reach; only the 2D command family works.</td>
+    </tr>
+    <tr>
+      <td>The driver runs in a real QNX 8.0 guest: it enumerates <code>1af4/1050</code>,
+      negotiates the device and publishes <code>/dev/gpu0</code>.</td>
+      <td><strong>No host&rarr;guest readback in 2D.</strong> The virtio-gpu 2D command set has no
+      <code>TRANSFER_FROM_HOST_2D</code>; the only host&rarr;guest transfer is the 3D one, which
+      needs virgl. The driver announces the refusal instead of faking it.</td>
+    </tr>
+    <tr>
+      <td>The test pattern painted by the guest is visible in the emulator: 1280&times;800, six
+      colour bars.</td>
+      <td><strong>The production path is not finished.</strong> The guest client maps the
+      framebuffer through the physical address; the real Screen path would go through the resmgr
+      <code>mmap</code> callout, which is only partially validated.</td>
+    </tr>
+    <tr>
+      <td>The FNV-1a hash published by the guest equals the hash recomputed from the emulator's
+      own screenshot.</td>
+      <td><strong>The live guest is a demo.</strong> An unrelated process on the workstation kills
+      it every 1&ndash;2 minutes; systemd restarts it within 10&nbsp;s, so the showcase works but
+      has holes.</td>
+    </tr>
+    <tr>
+      <td>The virtio-input keyboard path: a real key reaches the guest, updates the shared
+      animation state, and the painters follow.</td>
+      <td><strong>The showcase is slower than the guest.</strong> It captures the emulator screen
+      about 7 times per second (the QEMU monitor <code>screendump</code> is the bottleneck); the
+      guest paints at 30&nbsp;im/s.</td>
+    </tr>
+    <tr>
+      <td>The portable core is deterministic: the same sequence gives the same state hash, byte for
+      byte, and the C and Python twins agree.</td>
+      <td><strong>One shared framebuffer.</strong> Three clients own three bands, each presents its
+      own rectangle. There is no compositor, no Z-order, no damage tracking, no per-client
+      isolation.</td>
+    </tr>
+    <tr>
+      <td>CI builds the core and runs the unit tests, the differential and the guards.</td>
+      <td><strong>The E-series of trials is not in CI.</strong> It runs on a developer workstation
+      with the QNX SDP; CI builds and unit-tests the core only.</td>
+    </tr>
+  </table>
+
+  <h2>What is not proven, item by item</h2>
+
+  <h3>No 3D</h3>
+  <p>The emulator's <code>virtio-gpu</code> device is started without virgl. Without that renderer
+  the device answers nothing to the 3D command family, so Toile implements and exercises the 2D
+  family only: resources, backing, scanouts, flush, cursor. Nothing in this repository claims a
+  3D path, and nothing has been measured on one.</p>
+
+  <h3>No host&rarr;guest readback in 2D</h3>
+  <p>The virtio-gpu 2D command set contains one transfer, <code>TRANSFER_TO_HOST_2D</code>
+  (<code>0x0105</code>), and it is guest&rarr;host. There is no
+  <code>TRANSFER_FROM_HOST_2D</code>: the host&rarr;guest copy belongs to
+  <code>TRANSFER_FROM_HOST</code> (<code>0x0206</code>), in the 3D family, and it needs virgl. When
+  a client asks for it, the device answers <code>0x1200</code> (<code>ERR_UNSPEC</code>) and the
+  driver reports the refusal explicitly. No fallback path fabricates a readback.</p>
+
+  <h3>The Screen display driver path is not finished</h3>
+  <p>What runs today is a client that maps the framebuffer through its physical address
+  (<code>MAP_PHYS</code>) and paints into it, then asks the driver to present a rectangle. The
+  production path for a QNX desktop is different: the display driver would take the framebuffer
+  from the resource manager through the <code>mmap</code> callout, so that a client cannot write
+  anywhere in the picture. That callout is only partially validated; the display-driver skeleton
+  compiles and links against the real Screen interface, but its integration is not tested.</p>
+
+  <h3>The live guest is a demo</h3>
+  <p>The guest shown on the <a href="emulator-live.html">live page</a> runs on a developer
+  workstation. An unrelated process there kills the virtual machine every one or two minutes;
+  systemd restarts it within about 10&nbsp;s. The showcase therefore works, with holes: for a few
+  seconds the page has no screen to show. It is a demonstration environment, not a service.</p>
+
+  <h3>The showcase samples the screen, the guest paints it</h3>
+  <p>The web showcase reads the emulator screen through the QEMU monitor
+  (<code>screendump</code>), which gives about 7 captures per second. The guest paints at 30
+  images per second. What the page shows is therefore a sampled, decimated view of the animation,
+  not the animation itself. The bottleneck is the monitor command, not the driver.</p>
+
+  <h3>One framebuffer, three clients, no compositor</h3>
+  <p>The guest clients paint one shared framebuffer. Three clients own three bands, and each one
+  presents its own rectangle. There is no compositor, no Z-order between clients, no damage
+  tracking, and no isolation: a client that mapped the framebuffer can write outside its band.
+  The bands are a convention between cooperating clients, not an enforced boundary.</p>
+
+  <h3>The trials are not automated</h3>
+  <p>The E-series of trials needs the QNX SDP and QEMU, so it runs on a developer workstation with
+  <code>qcc</code> and <code>mkifs</code>. CI builds and unit-tests the portable core only: the C
+  core, the Python twin, the differential and the guards. A green CI run therefore says nothing
+  about the guest driver, about QEMU, or about the trials.</p>
+
+  <h2>What IS proven</h2>
+
+  <h3>The typed API is frozen</h3>
+  <p>28 public signatures are frozen in <code>CONTRACT.md</code> &sect;10 and mirrored in
+  <code>core/include/toile/</code> and <code>host/toile/</code>. On the guest side,
+  <code>/dev/gpu0</code> exposes a typed <code>devctl</code> API: <code>INFO</code>,
+  <code>FB</code>, <code>PRESENT</code>, <code>MIRE</code>, <code>ANIM_GET</code>,
+  <code>ANIM_SET</code>. The CI guard <code>.github/checks/api-frozen.py</code> fails the build if
+  one of them disappears.</p>
+
+  <h3>The driver runs in a real QNX 8.0 guest</h3>
+  <p>Under QEMU with <code>-device virtio-gpu-pci</code>, the guest driver finds
+  <code>1af4/1050</code> on the PCI bus, gets an answer to <code>GET_DISPLAY_INFO</code> (scanout 0,
+  1280&times;800), gets <code>RESOURCE_CREATE_2D</code> with backing and <code>SET_SCANOUT</code>
+  accepted, and publishes <code>/dev/gpu0</code>. An ordinary client opens it, queries it and
+  paints.</p>
+
+  <h3>The guest-painted pattern is visible in the emulator</h3>
+  <p>The test pattern is painted inside the guest, not injected from the host. The emulator window
+  shows it: 1280&times;800, the scanout mode, six solid colour bars. The capture is made
+  headless, through VNC and the monitor <code>screendump</code>.</p>
+
+  <h3>The hash of the picture matches, on both sides</h3>
+  <p>The guest computes the FNV-1a hash of the framebuffer it painted, publishes it on the serial
+  console and holds the frame for 2.5&nbsp;s (<code>ANIM_HOLD_MS</code> in
+  <code>guest/common/toile_anim_main.c</code>). The host recomputes the hash from the pixels QEMU
+  actually rendered and compares. The two hashes are equal, which shows that the bytes the guest
+  painted are the bytes the emulator displays. One command:
+  <code>qemu/verify-hash.sh</code>.</p>
+
+  <h3>The keyboard reaches the painters</h3>
+  <p>The chain is complete and exercised: a key sent to the QEMU monitor arrives through
+  <code>virtio-input</code>, the guest driver reads it from the event queue, writes the shared
+  animation state through <code>devctl</code>, and the painters read that state. Palette, speed and
+  pause change on the screen because a key was pressed.</p>
+
+  <h2>How to reproduce</h2>
+  <ol>
+    <li><strong>The core, anywhere, without QNX, QEMU or GPU</strong>:
+    <code>make build &amp;&amp; make test</code> &mdash; C unit tests, Python unit tests, the
+    C&harr;Python differential on the fixtures, then the size and frozen-API guards.</li>
+    <li><strong>The guest driver in a real guest</strong>:
+    <code>qemu/probe-driver.sh</code> &mdash; builds the image, starts the VM, waits for the proof
+    (device found, <code>/dev/gpu0</code> published), stops the VM.</li>
+    <li><strong>The painted pattern in the emulator</strong>:
+    <code>qemu/run-demo.sh</code> &mdash; boots the guest, paints the pattern from inside it,
+    captures the screen and reports the verdict.</li>
+    <li><strong>The hash proof, in one command</strong>:
+    <code>qemu/verify-hash.sh</code> &mdash; the guest publishes its FNV-1a and holds the frame;
+    the host recomputes the hash from the screenshot and compares.</li>
+    <li><strong>The persistent guest behind the showcase</strong>:
+    <code>qemu/toile-vitrine.sh</code> &mdash; the same VM, left running under systemd, with the
+    serial log and the monitor socket the showcase reads.</li>
+    <li><strong>The readback refusal</strong>: ask a client for
+    <code>TRANSFER_FROM_HOST</code> (<code>0x0206</code>) and read the serial log: the device
+    answers <code>0x1200</code> (<code>ERR_UNSPEC</code>), and the driver says so.</li>
+  </ol>
+  <p>The scripts of points 2 to 5 need the QNX SDP (<code>qcc</code>, <code>mkifs</code>) and
+  QEMU. Point 1 needs neither, and is the only one CI runs.</p>
+
+  <h2>Other pages</h2>
+  <ul>
+    <li><a href="index.html">Home</a> &mdash; the problem and the promise</li>
+    <li><a href="architecture.html">Architecture</a> &mdash; the three layers and the portability rule</li>
+    <li><a href="emulator.html">Emulator</a> &mdash; the QEMU loop and the one-command demo</li>
+    <li><a href="emulator-live.html">Live</a> &mdash; the running guest, screen and console</li>
+    <li><a href="trials.html">Trials</a> &mdash; E1&ndash;E6, with raw evidence</li>
+    <li><a href="contract.html">Contract</a> &mdash; the frozen protocol and API</li>
+    <li><a href="codelab.html">Codelab</a> &mdash; &ldquo;Giving a QNX VM a display&rdquo;</li>
+    <li>The repository: <a href="https://github.com/Tradoooo/toile">github.com/Tradoooo/toile</a>
+    (MIT)</li>
+  </ul>
+</main>
+
+<footer class="site"><div class="wrap">Toile &middot; virtio-gpu 2D for QNX 8.0 guest &middot; QNX Global Hackathon 2026</div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>
