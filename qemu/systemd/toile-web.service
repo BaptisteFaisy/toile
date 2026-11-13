@@ -1,0 +1,26 @@
+# toile-web.service — Vitrine HTTP de TOILE (écran VGA, console, touches).
+#
+# Adapté de qnx-emu/systemd/replique-ems-web.service.
+# Lit l'écran VGA via le moniteur QEMU (screendump) et la console via le
+# journal série : ces chemins doivent être IDENTIQUES à ceux de l'unité
+# QEMU jumelle (toile-qemu.service).
+#
+# NOTE — %h n'est PAS développé dans Environment= (systemd) : chemins absolus.
+[Unit]
+Description=Vitrine HTTP — Toile (écran, console, touches)
+After=toile-qemu.service
+
+[Service]
+Type=simple
+Environment=QNX_EMS_SERIE=/home/baptiste/Bureau/toile-demo/serial.log
+Environment=QNX_EMS_MON=/home/baptiste/Bureau/toile-demo/mon.sock
+Environment=QNX_EMS_PPM=/home/baptiste/Bureau/toile-demo/web-vga.ppm
+Environment=QNX_EMS_PORT=8111
+Environment=QNX_EMS_TITRE=Toile sur QNX 8.0
+Environment=QNX_EMS_NOTE=invité QNX 8.0 (QEMU) — le pilote Toile peint par virtio-gpu
+ExecStart=/usr/bin/python3 %h/Bureau/qnx-emu/web.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

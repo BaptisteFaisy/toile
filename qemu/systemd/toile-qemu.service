@@ -1,0 +1,32 @@
+# toile-qemu.service — Invité QNX 8.0 de TOILE (QEMU, poste `pc`).
+#
+# Adapté de qnx-emu/systemd/replique-ems-qemu.service, mais avec le
+# périphérique `virtio-gpu-pci` : l'invité doit voir le device virtio-gpu
+# (1af4/1050), c'est lui que le pilote Toile pilote (guest/gpu/).
+#
+# L'affichage est servi par VNC (sans serveur X) : `screendump` sur le
+# moniteur rend alors l'image de l'écran VGA de l'invité — c'est ce que lit
+# la vitrine HTTP (toile-web.service).
+#
+# Les chemins doivent être IDENTIQUES à ceux de l'unité web jumelle
+# (toile-web.service) : --serie, --moniteur.
+#
+# NOTE — %h n'est PAS développé dans Environment= (systemd) : les chemins y
+# sont en absolu ; %h ne marche que dans ExecStart.
+[Unit]
+Description=Invité QNX 8.0 — Toile (QEMU, pilote virtio-gpu)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/Bureau/toile/qemu/toile-vitrine.sh \
+    --ifs %h/Bureau/toile-demo/ifs.bin \
+    --serie %h/Bureau/toile-demo/serial.log \
+    --moniteur %h/Bureau/toile-demo/mon.sock \
+    --vnc 12 --memoire 1536
+Restart=always
+RestartSec=10
+KillMode=mixed
+
+[Install]
+WantedBy=default.target

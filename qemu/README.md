@@ -1,13 +1,38 @@
 # qemu/ — scripts de lancement (volet A)
 
-Trois scripts, testés le 2026-11-12 sur cette machine (QEMU 8.2.2,
-`/usr/bin/qemu-system-x86_64`).
+Scripts testés sur cette machine (QEMU 8.2.2, `/usr/bin/qemu-system-x86_64`) :
+E1 le 2026-11-12, la boucle invité → émulateur le 2026-11-13.
 
 | Script | Rôle |
 |---|---|
+| `run-demo.sh` | **la démo en une commande** : compile pilote + client, construit l'IFS, démarre QEMU, fait ouvrir `/dev/gpu0` et peindre la mire par un client, capture l'affichage, vérifie la capture numériquement, tranche le verdict |
+| `probe-driver.sh` | la procédure VM (source unique) : build IFS, démarrage, capture série et affichage, verdict E6 |
 | `probe-e1.sh` | **procédure E1** : construit l'IFS de sonde, démarre la VM avec le périphérique choisi, capture la console série, tranche le verdict (présence de `1af4/1050`) |
+| `toile-vitrine.sh` | lancement **persistant** de l'invité pour la vitrine HTTP (la VM reste allumée ; systemd la supervise) |
 | `run-toile.sh` | lance la VM QNX invitée avec le pilote Toile (image graphique ou image de sonde) |
 | `variants.sh` | les trois variantes de périphérique à tester pour E1 (`virtio-gpu-pci`, `virtio-gpu-device` MMIO, `virtio-vga`) |
+| `systemd/` | unités utilisateur `toile-qemu.service` + `toile-web.service` de la vitrine live |
+
+## La vitrine live (poste `pc`)
+
+```sh
+# 1. (une fois) l'image invitée QNX 8.0, construite depuis guest/ ;
+#    l'IFS produit par la sonde (toile-driver.ifs) est celui que sert la vitrine
+TOILE_WORK=$HOME/Bureau/toile-demo ./qemu/probe-driver.sh
+cp "$HOME/Bureau/toile-demo/toile-driver.ifs" "$HOME/Bureau/toile-demo/ifs.bin"
+# 2. les services utilisateur (unités fournies dans qemu/systemd/)
+cp qemu/systemd/toile-{qemu,web}.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now toile-qemu.service toile-web.service
+# 3. la vitrine est servie sur http://127.0.0.1:8111 (écran /screen.png,
+#    console /console) et publiée par le funnel Tailscale du poste :
+#    https://baptiste-ms-7d18.tail3a8bdf.ts.net:8443/toile/
+```
+
+La page `site/emulator-live.html` lit cette vitrine (écran et console,
+rafraîchis toutes les 2 s). La vitrine elle-même est `qnx-emu/web.py` : elle
+capture l'écran par `screendump` sur le moniteur QEMU et lit le journal série —
+aucun serveur X n'est nécessaire.
 
 ## Procédure E1, pas à pas
 
@@ -104,3 +129,6 @@ socat - UNIX-CONNECT:/tmp/toile-serial.sock
   « complète » (35 Go) demande un disque.
 - Les images de ce dépôt sont **autonomes** (tout en RAM, via `-kernel`) :
   pas de `/system`, donc pas de bureau QNX complet — voir `image/README.md`.
+- La vitrine lit l'écran par `screendump` : elle dépend du moniteur QEMU
+  (`-monitor unix:…`) et de la présence d'un affichage (`-vnc :N`) ; sans
+  `-vnc`, `screendump` ne rend rien.
