@@ -90,7 +90,7 @@ jobs:
           URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
                  -H "Accept: application/vnd.github+json" \
                  "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
-                 | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if a['name']=='toile-guest.ifs'))" \
+                 | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if a['name']=='toile-verify.ifs'))" \
                  2>/dev/null || true)
           if [ -n "$URL" ]; then
             curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -o "$DIR/toile-guest.ifs" "$URL"
@@ -98,7 +98,7 @@ jobs:
             echo "ifs_tag=$TAG" >> "$GITHUB_OUTPUT"
             echo "image IFS telechargee ($TAG) : $(stat -c %s "$DIR/toile-guest.ifs") octets"
           else
-            echo "::warning::aucune release '$TAG' avec l'asset toile-guest.ifs : la preuve C est sautee (publier une image avec qemu/publish-ifs.sh)"
+            echo "::warning::aucune release '$TAG' avec l'asset toile-verify.ifs : la preuve C est sautee (publier une image avec qemu/publish-ifs.sh)"
             echo "ifs_path=" >> "$GITHUB_OUTPUT"
             echo "ifs_tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
