@@ -18,7 +18,7 @@ Règle de lecture de ce document, appliquée partout :
 | **E3** | Le transport virtio de Passerelle est-il réutilisable tel quel ? | **PARTIELLEMENT TRANCHÉ** | `TRIALS-E1-E4.md` §E3 |
 | **E4** | Le DDK hyperviseur est-il accessible ? | **TRANCHÉ — NÉGATIF** | `TRIALS-E1-E4.md` §E4 |
 | **E5** | 15–20 images/s en 1080p via un flush 2D ? | **NON MESURÉ** | `TRIALS-E5.md` |
-| **E6** | **Le pilote invité Toile démarre-t-il dans un invité QNX 8.0, trouve-t-il le `virtio-gpu`, crée-t-il `/dev/gpu0` ?** | **TRANCHÉ — POSITIF sur les trois points**, avec **un défaut ouvert** sur le chemin « client » du resmgr | **ci-dessous** |
+| **E6** | **Le pilote invité Toile démarre-t-il dans un invité QNX 8.0, trouve-t-il le `virtio-gpu`, crée-t-il `/dev/gpu0` ?** | **TRANCHÉ — POSITIF sur les trois points**, et **la boucle invitée → émulateur est fermée** (un client ouvre `/dev/gpu0` et la mire peinte dans l'invité est visible dans QEMU) | **ci-dessous** |
 
 ---
 
@@ -38,11 +38,31 @@ démarré sous QEMU 8.2.2 avec `-device virtio-gpu-pci` :
 3. il **envoie `RESOURCE_CREATE_2D` + `RESOURCE_ATTACH_BACKING` +
    `SET_SCANOUT`**, que le périphérique accepte (ressource 1 créée) ;
 4. il **publie `/dev/gpu0`** (resource manager, `resmgr_attach` renvoie 0)
-   et l'annonce sur la console.
+   et l'annonce sur la console ;
+5. **un client ordinaire l'ouvre** (`open("/dev/gpu0", O_RDWR)` → `fd=3`,
+   `iofunc_open_default` → `rc=0`), l'interroge par `devctl`, lui fait
+   **peindre la mire** et la **présenter** au scanout, et **la mire apparaît
+   dans l'affichage de QEMU** (§ « Preuve B » plus bas).
 
-**Un défaut reste ouvert** (§ « Défaut ouvert » plus bas) : le resource
-manager QNX 8.0 plante quand un *client* ouvre `/dev/gpu0`. La publication
-du nœud est prouvée ; l'usage du nœud par un client ne l'est pas encore.
+**Le défaut qui bloquait l'ouverture du nœud est CORRIGÉ** (§ « Le défaut
+corrigé » plus bas) : la cause exacte était que `resmgr_attach()` conserve
+les *pointeurs* vers les tables de gestionnaires, lesquelles étaient
+déclarées sur la pile d'une fonction qui rendait la main.
+
+### La boucle invitée → émulateur, en une commande
+
+```sh
+cd /home/baptiste/Bureau/toile
+./qemu/run-demo.sh            # compile, construit l'IFS, démarre QEMU,
+                               # fait peindre la mire par le client,
+                               # capture l'affichage, affiche le verdict
+```
+
+`run-demo.sh` est **headless** (VNC sans serveur X) et se règle par
+variables d'environnement : `TOILE_SDP`, `TOILE_WORK`, `TOILE_VARIANT`,
+`TOILE_DISPLAY` (`none` | `vnc` | `egl-headless`), `TOILE_TIMEOUT`.
+Il dépose la capture dans `docs/preuves/` et rend **0** si la boucle est
+complète.
 
 ### Méthode employée
 
@@ -104,8 +124,10 @@ cd /home/baptiste/Bureau/toile && ./qemu/probe-driver.sh ; echo "rc=$?"
 
 ### Sortie brute [VM — exécuté le 2026-11-12]
 
+### Sortie brute [VM] — **avant** correctif (2026-11-12, référence)
+
 Journal série complet (`/tmp/toile-driver/serial-virtio-gpu-pci.log`,
-retours chariot supprimés) :
+retours chariot supprimés) — **état historique conservé pour comparaison** :
 
 ```
 non UEFI or UEFI+CSM boot
@@ -136,7 +158,7 @@ client rc=1
 === TOILE_DRIVER_PROBE_END ===
 ```
 
-Verdict du script [MACHINE] :
+Verdict du script [MACHINE] — **avant** correctif :
 
 ```
 $ ./qemu/probe-driver.sh ; echo "rc=$?"
@@ -146,6 +168,67 @@ $ ./qemu/probe-driver.sh ; echo "rc=$?"
 [probe-driver]   (réserve) le client /dev/gpu0 n'a pas pu ouvrir le noeud :
 [probe-driver]   le resmgr QNX 8.0 plante sur le message _IO_CONNECT du client
 [probe-driver]   (défaut documenté dans docs/TRIALS-E1-E6.md, §Défaut ouvert)
+rc=0
+```
+
+### Sortie brute [VM] — **après** correctif (2026-11-13)
+
+Journal série complet (`$TOILE_WORK/serial-virtio-gpu-pci.log`,
+retours chariot supprimés) :
+
+```
+=== TOILE_DRIVER_PROBE_BEGIN ===
+--- client /dev/gpu0 ---
+CLIENT: ouverture de /dev/gpu0
+TOILE: virtio-gpu trouve (1af4/1050) sur B000:D03:F00
+toile-gpu: device up: 0 queues, msix=yes, features=0x100000000
+toile-gpu: no cursorq: hardware cursor disabled (level C)
+toile-gpu: scanout 0 mode 1280x800 (enabled)
+toile-gpu: framebuffer 1280x800 fmt=2 stride=5120 pa=0x5e003000
+toile-gpu: scanout 0 <- resource 1 (1280x800)
+toile-gpu: 1280x800 fmt=2 scanouts=1 stride=5120 res=1 fb=4096000
+toile-gpu: serving /dev/gpu0
+TOILE: /dev/gpu0 pret
+toile-gpu: resmgr: open -> rc=0
+CLIENT: /dev/gpu0 ouvert (fd=3)
+CLIENT: info 1280x800 fmt=2 scanouts=1 stride=5120 res=1 fb=4096000
+CLIENT: framebuffer paddr=0x5e003000 bytes=4096000 stride=5120 1280x800
+toile-gpu: device error response 0x1200 for cmd 0x0206
+TOILE: relecture transfer_from_host(0x0206) rc=-4 resp=0x1200 avant=13a87ef6963752f3 apres=13a87ef6963752f3 REFUSEE_PAR_LE_PERIPHERIQUE
+CLIENT: mire peinte et presentee
+CLIENT: OK
+client rc=0
+--- pidin ---
+     pid tid name                         prio STATE          Blocked
+       1   1 /proc/boot/procnto-smp-instr   0f READY
+       1  10 /proc/boot/procnto-smp-instr  10r RUNNING
+       2   1 proc/boot/devc-ser8250        24r RECEIVE        1
+       3   1 proc/boot/pci-server          10r RECEIVE        1
+       4   1 proc/boot/ksh                 10r SIGSUSPEND
+       5   1 proc/boot/toile-gpu           10r RECEIVE        1
+   12294   1 proc/boot/pidin               10r REPLY          1
+=== TOILE_DRIVER_PROBE_END ===
+```
+
+Plus de `SIGSEGV` : le client ouvre le nœud (`fd=3`), interroge le
+pilote, fait peindre et présenter la mire, et sort avec `rc=0`.
+
+Verdict du script [MACHINE] — **après** correctif :
+
+```
+$ TOILE_DISPLAY=vnc ./qemu/run-demo.sh ; echo "rc=$?"
+[probe-driver] VERDICT DRIVER = POSITIF
+[probe-driver]   TOILE: virtio-gpu trouve (1af4/1050) sur B000:D03:F00
+[probe-driver]   TOILE: /dev/gpu0 pret
+[probe-driver]   CLIENT: /dev/gpu0 ouvert (fd=3)
+[probe-driver]   CLIENT: mire peinte et presentee
+[probe-driver] VERDICT CAPTURE = POSITIF : la mire est visible dans QEMU
+=== Verdict ===
+  Boucle invitée -> émulateur : PROUVÉE
+  - /dev/gpu0 ouvert par un client ordinaire (plus de SIGSEGV)
+  - mire peinte par l'invité et présentée au scanout virtio-gpu
+  - capture de l'affichage QEMU vérifiée numériquement
+  - preuve déposée : docs/preuves/toile-mire-client-1280x800.png (4412 octets)
 rc=0
 ```
 
@@ -159,6 +242,10 @@ rc=0
 | `framebuffer 1280x800 fmt=2 stride=5120 pa=0x5e003000` | allocation DMA **physiquement contiguë** (4 096 000 octets) |
 | `scanout 0 <- resource 1 (1280x800)` | **le périphérique a accepté `RESOURCE_CREATE_2D`, `RESOURCE_ATTACH_BACKING` et `SET_SCANOUT`** — c'est la phase 2 (bonus) |
 | `serving /dev/gpu0` + `TOILE: /dev/gpu0 pret` | `resmgr_attach()` a renvoyé 0 : le nœud `/dev/gpu0` est publié dans l'espace de noms du noyau |
+| `toile-gpu: resmgr: open -> rc=0` + `CLIENT: /dev/gpu0 ouvert (fd=3)` | **un client ordinaire ouvre le nœud** : le resmgr survit à la requête et l'OCB est créé (`iofunc_open_default` → `rc=0`) |
+| `CLIENT: info 1280x800 fmt=2 …` + `CLIENT: framebuffer paddr=0x5e003000 …` | les `devctl` Toile répondent (`DCMD_TOILE_GPU_INFO`, `DCMD_TOILE_GPU_FB`) |
+| `CLIENT: mire peinte et presentee` | le pilote a peint la mire dans le framebuffer et l'a présentée (`TRANSFER_TO_HOST_2D` + `RESOURCE_FLUSH`) |
+| `TOILE: relecture transfer_from_host(0x0206) … REFUSEE_PAR_LE_PERIPHERIQUE` | la relecture 0x0206 a été **tentée** et **refusée** par le device (`0x1200` = `ERR_UNSPEC`) — voir § « Preuve A » |
 
 ### Phase atteinte
 
@@ -171,43 +258,79 @@ rc=0
   (`RESOURCE_CREATE_2D`, avec son backing et son scanout) part sur la file
   de contrôle et **est acceptée par le périphérique** (ressource 1 créée,
   mode 1280×800 négocié). Le pilote journalise le verdict.
+- **Phase 3 (fermeture de la boucle) : ATTEINTE.** Un client ouvre
+  `/dev/gpu0`, le pilote y peint la mire et la présente, et **la mire est
+  visible dans l'affichage de QEMU** (§ « Preuve B »).
 
-### Défaut ouvert (à ne pas masquer)
+### Le défaut corrigé : cause exacte du SIGSEGV et correctif
 
-`/dev/gpu0` est **publié** mais un client ne peut pas encore l'ouvrir : à
-la première requête d'un client, le pilote meurt sur `SIGSEGV` (`addr=10`,
-c'est-à-dire un déréférencement de `NULL + 16`).
+**Symptôme** (avant correctif) : `/dev/gpu0` était **publié** mais un
+client ne pouvait pas l'ouvrir ; à la première requête d'un client, le
+pilote meurt sur `SIGSEGV` (`addr=10`, c'est-à-dire un déréférencement de
+`NULL + 16`).
 
-Analyse faite, documentée, **non résolue** :
+**Cause exacte** — `resmgr_attach()` **conserve les POINTEURS** vers les
+tables de gestionnaires, il n'en fait pas de copie. La documentation QNX
+8.0 l'écrit noir sur blanc dans *Writing a Resource Manager* →
+*Connect messages* (`com.qnx.doc.neutrino.resmgr/topic/
+fleshing_out_Connect_messages.html`) :
 
-- le message reçu est un `_IO_CONNECT` (type `0x100`, sous-type `1` =
-  `_IO_CONNECT_COMBINE_CLOSE`) envoyé par le client (`stat()`/
-  `realpath()` sont packagés ainsi par la libc client QNX 8.0) ;
-- le gestionnaire **interne de la bibliothèque resmgr de QNX 8.0** plante
-  **avant** d'appeler le moindre gestionnaire du pilote : ni
-  `connect_funcs.open`, ni `connect_funcs.combo`, ni `io_funcs.stat` ne
-  sont appelés (tracé par journalisation dans les trois gestionnaires) ;
-- le crash se produit dans la bibliothèque, pas dans le code Toile : le
-  pointeur d'OCB (`ctp->iov[0].iov_base`) vaut `NULL` au moment où la
-  bibliothèque s'en sert.
+> The `resmgr_attach()` function copies the pointers to the
+> `resmgr_connect_funcs_t` and `resmgr_io_funcs_t` structures, **not the
+> structures themselves**. You should allocate the structures, declare them
+> to be static, or make them global variables.
 
-Éléments déjà corrigés au passage (et **documentés dans le patch
-`guest/virtio/toile-virtio-gpu.patch`** ou dans `guest/gpu/gpu_resmgr.c`) :
+Or le code de `guest/gpu/gpu_resmgr.c` déclarait ces deux tables — **et le
+`resmgr_attr_t`** — comme variables **locales** de `gpu_resmgr_attach()`,
+fonction **qui rend la main** juste après l'appel. À la première requête
+client, la bibliothèque resmgr relisait donc des pointeurs pendants vers une
+frame de pile déjà réutilisée : elle sautait dans n'importe quoi, d'où le
+`SIGSEGV` à une adresse minuscule (`0x10`) **avant** d'atteindre le moindre
+gestionnaire Toile — ce qui expliquait l'observation « le crash précède
+tous mes handlers ».
 
-- l'ordre des inclusions (`<sys/iofunc.h>` **avant** `<sys/resmgr.h>`) :
-  sans lui `RESMGR_HANDLE_T` vaut `void` et le prototype du gestionnaire
-  `open` ne correspond plus ;
-- `connect_funcs.open` et `connect_funcs.combo` sont renseignés
-  (`iofunc_func_init()` ne remplit pas la table des connect) ;
-- `io_funcs.stat` est protégé contre un OCB `NULL` (au lieu de déréférencer
-  `NULL`).
+**Correctif** (`guest/gpu/gpu_resmgr.c`) :
 
-**Ce qui reste à faire** pour ce défaut : comprendre la séquence
-`_IO_CONNECT_COMBINE_CLOSE` de la bibliothèque resmgr QNX 8.0 (le
-sous-type 1 est documenté comme « open + opération + close »), ou
-implémenter le gestionnaire `combo` de façon complète (création de l'OCB,
-opération, fermeture). Non fait à ce jour : le budget du lot était
-consommé par la mise au point du transport.
+1. les tables passent en **statique de fichier** (`g_rattr`,
+   `g_connect_funcs`, `g_io_funcs`), donc vivantes aussi longtemps que le
+   processus ;
+2. le **callout `combo` maison est supprimé** : le message
+   `_IO_CONNECT_COMBINE_CLOSE` est laissé à la bibliothèque, qui déroule
+   elle-même « open → opération → close » (doc *Connect message types*) ;
+3. `iofunc_func_init()` remplit déjà `connect.open = iofunc_open_default` ;
+   le handler Toile ne fait plus qu'**envelopper** ce défaut pour le
+   journaliser, sans le remplacer ;
+4. `iofunc_attr_init()` reçoit le bon mode (`S_IFCHR | 0666`) : le nœud est
+   un périphérique, pas un fichier ordinaire ;
+5. le `devctl` Toile reste le **seul** handler I/O surchargé
+   (`io_funcs.devctl`), les autres restent les défauts POSIX iofunc.
+
+**Preuve du correctif** ([VM], sortie brute ci-dessus) :
+
+```
+toile-gpu: serving /dev/gpu0
+TOILE: /dev/gpu0 pret
+toile-gpu: resmgr: open -> rc=0
+CLIENT: /dev/gpu0 ouvert (fd=3)
+CLIENT: info 1280x800 fmt=2 scanouts=1 stride=5120 res=1 fb=4096000
+CLIENT: framebuffer paddr=0x5e003000 bytes=4096000 stride=5120 1280x800
+CLIENT: mire peinte et presentee
+CLIENT: OK
+client rc=0
+```
+
+Plus aucun `SIGSEGV`, et le client va au bout (ouverture, `devctl` INFO,
+`devctl` FB, peinture, présentation).
+
+**Note d'honnêteté** : la cause a été trouvée en **lisant la documentation
+du SDP**, pas en tâtonnant — l'hypothèse « pointeur d'OCB `NULL` » de
+l'analyse précédente était **infime** ; la cause réelle est la durée de vie
+des tables de gestionnaires. Les deux autres correctifs listés dans
+l'ancienne version de cette section (ordre des inclusions
+`<sys/iofunc.h>` avant `<sys/resmgr.h>`, protection de `io_funcs.stat`
+contre un OCB `NULL`) sont **conservés** : le premier est requis par la
+définition de `RESMGR_HANDLE_T`, le second est devenu sans objet puisque
+le gestionnaire `stat` n'est plus surchargé.
 
 ### Corrections apportées au code invité par cet essai
 
@@ -238,21 +361,130 @@ corrections (toutes dans `guest/`, zone réservée à ce lot) :
    options initialisées (le `gpu_opts` non initialisé faisait parfois
    quitter le pilote au hasard) ; gestionnaire de signal fatal qui annonce
    `TOILE: signal fatal <n> addr=<p>` au lieu de mourir en silence.
-6. **`guest/gpu/gpu_resmgr.c`** — gestionnaire `connect_funcs.open`
-   (`iofunc_open_default`) et `connect_funcs.combo`, `io_funcs.stat`
-   protégé, `resmgr_attr_t` complété (`msg_max_size`, `nparts_max`).
+6. **`guest/gpu/gpu_resmgr.c`** — **tables de gestionnaires et `resmgr_attr_t`
+   passés en statique de fichier** (durée de vie exigée par `resmgr_attach()`),
+   **callout `combo` maison supprimé** (la bibliothèque gère
+   `_IO_CONNECT_COMBINE_CLOSE`), `connect.open` = enveloppe de
+   `iofunc_open_default` (journalisation seule), `io_funcs.devctl` = seul
+   handler I/O surchargé, `iofunc_attr_init()` en `S_IFCHR | 0666`.
 7. **`guest/common/toile_gpu_probe.c`** (nouveau) — client de preuve :
-   il ouvre `/dev/gpu0` comme un client ordinaire et interroge le pilote
-   par `devctl(DCMD_TOILE_GPU_INFO)`.
+   il ouvre `/dev/gpu0` comme un client ordinaire, interroge le pilote
+   par `devctl(DCMD_TOILE_GPU_INFO)` et `devctl(DCMD_TOILE_GPU_FB)`, puis
+   demande la peinture de la mire (`DCMD_TOILE_GPU_MIRE`) et sa présentation
+   (`DCMD_TOILE_GPU_PRESENT`).
+8. **`guest/gpu/gpu_resmgr.c`** (empreinte de relecture) — à la peinture de
+   la mire, le pilote **empreint** le framebuffer (FNV-1a 64), émet
+   `TRANSFER_FROM_HOST_3D` (0x0206) et ré-empreint, pour tenter la preuve
+   numérique A (§ « Preuve A »).
+
+### Preuve A (relecture numérique) — **NON SUPPORTÉE par le périphérique de test**
+
+La commande de relecture hôte→invité du protocole virtio-gpu 2D est
+`TRANSFER_FROM_HOST_3D`, code **0x0206** (exposé dans le DSL du cœur sous
+le nom `transfer_from_host`, `core/include/toile/vgproto.h:37`). Le pilote
+l'émet après la peinture de la mire, et compare l'empreinte du framebuffer
+avant et après.
+
+**Sortie brute** ([VM], journal série de la commande `run-demo.sh`) :
+
+```
+toile-gpu: device error response 0x1200 for cmd 0x0206
+TOILE: relecture transfer_from_host(0x0206) rc=-4 resp=0x1200 \
+  avant=13a87ef6963752f3 apres=13a87ef6963752f3 REFUSEE_PAR_LE_PERIPHERIQUE
+```
+
+**Verdict : la lecture n'est PAS supportée par le périphérique de test.**
+`0x1200` est `VIRTIO_GPU_RESP_ERR_UNSPEC` : le device virtio-gpu de QEMU
+8.2.2 **sans virgl** n'implémente pas la commande 3D `TRANSFER_FROM_HOST_3D`
+(série 0x02xx) — il ne connaît que la série 2D 0x01xx. Le code `0x0206`
+exige un contexte 3D (virgl), absent ici.
+
+Conséquences, dites franchement :
+
+- les deux empreintes sont **identiques** (`13a87ef6963752f3`), mais c'est
+  **sans valeur probante** : rien n'a été recopié, le périphérique a
+  refusé la commande. La ligne l'annonce explicitement
+  (`REFUSEE_PAR_LE_PERIPHERIQUE`) au lieu de laisser croire à une preuve ;
+- **la preuve A, telle que spécifiée (relecture par le device), est
+  impossible sur ce device de test** ; elle demanderait un device virgl
+  (`virtio-gpu-gl-pci` avec `virgl`/EGL), pas disponible ici ;
+- la preuve du transit invité→émulateur est donc portée par la **preuve B**
+  ci-dessous, qui est **numérique** (comparaison de pixels, pas seulement
+  une image) : le contenu exact de la mire peinte dans l'invité est relu
+  **par l'hôte**, dans l'image de l'affichage QEMU.
+
+### Preuve B (capture de l'affichage QEMU) — **POSITIVE**
+
+**Procédure** ([MACHINE], rejouable en une commande) :
+
+```sh
+cd /home/baptiste/Bureau/toile
+TOILE_DISPLAY=vnc ./qemu/run-demo.sh
+```
+
+`run-demo.sh` lance QEMU avec `-vnc :7` (serveur VNC = display actif,
+**sans serveur X**) et `-monitor unix:…` ; à la fin de la sonde il émet la
+commande HMP `screendump /tmp/…/toile-shot.ppm` via le monitor, convertit
+le PPM en PNG (Pillow) et **vérifie numériquement** le contenu.
+
+**Sortie brute** [MACHINE] :
+
+```
+[probe-driver] affichage VNC actif sur :7 (capture possible)
+[probe-driver] capture de l'affichage QEMU (screendump HMP) vers /tmp/toile-final/toile-shot.ppm
+[probe-driver] analyse numérique de la capture
+capture: 1280x800, 263 couleurs distinctes, non-noirs=927400 (90.6%)
+  barres     : OK
+  dégradé    : (31, 31, 31) -> (223, 223, 223)
+  damier     : (224, 224, 224) / (32, 96, 160)
+[probe-driver] VERDICT CAPTURE = POSITIF : la mire est visible dans QEMU
+[probe-driver]   capture: /tmp/toile-final/toile-shot.png
+```
+
+**Vérification numérique** — la mire de `guest/common/toile_pattern.c` est
+rejouée sur l'image capturée :
+
+| Contrôle | Attendu | Lu | Verdict |
+|---|---|---|---|
+| barre 0 (blanc) | `(255,255,255)` | `(255,255,255)` | OK |
+| barre 1 (jaune) | `(255,255,0)` | `(255,255,0)` | OK |
+| barre 2 (cyan) | `(0,255,255)` | `(0,255,255)` | OK |
+| barre 3 (vert) | `(0,255,0)` | `(0,255,0)` | OK |
+| barre 4 (magenta) | `(255,0,255)` | `(255,0,255)` | OK |
+| barre 5 (rouge) | `(255,0,0)` | `(255,0,0)` | OK |
+| barre 6 (bleu) | `(0,0,255)` | `(0,0,255)` | OK |
+| barre 7 (noir) | `(0,0,0)` | `(0,0,0)` | OK |
+| dégradé de gris | gris croissant | `(31,31,31)` → `(223,223,223)` | OK |
+| damier 16 px | 2 couleurs distinctes | `(224,224,224)` / `(32,96,160)` | OK |
+| pixels non noirs | > 50 % | 927 400 / 1 024 000 = **90,6 %** | OK |
+| couleurs distinctes | > 8 | **263** (le dégradé en compte 256) | OK |
+
+Les 8 barres couvrent chacune 96 000 px, soit exactement
+`(1280/8) × (800×3/4) = 160 × 600` : la géométrie de la mire est respectée
+au pixel près. **L'image n'est pas noire** (90,6 % de pixels non noirs) et
+elle contient bien la mire, à la bonne place.
+
+**Chemin des images** :
+
+| Image | Chemin | Taille |
+|---|---|---|
+| capture de cette démonstration (peinture **par le client** via `/dev/gpu0`) | `docs/preuves/toile-mire-client-1280x800.png` | 4 412 octets |
+| capture antérieure (peinture par le pilote seul, `--mire`) | `docs/preuves/toile-mire-1280x800.png` | 4 412 octets |
+| capture brute de la dernière exécution | `$TOILE_WORK/toile-shot.png` (PNG) et `toile-shot.ppm` (PPM) | ~4 Ko / ~3 Mo |
+
+Les deux PNG sont **identiques** (même md5 `d3c0df5b…`) : c'est attendu,
+la mire est la même ; ils se distinguent par le **chemin qui la produit**
+(l'un par le client via `/dev/gpu0`, l'autre par le pilote seul).
 
 ### Ce qui reste à faire (au-delà de ce lot)
 
-- **Résoudre le défaut `connect` du resmgr** (ci-dessus) : c'est le
-  bloquant pour démontrer `/dev/gpu0` *utilisable* (donc pour l'intégration
-  Screen, E2).
 - **Intégration Screen** (E2) : le display driver tiers (OpenWF Display /
   Wfdcfg) n'existe pas encore ; le squelette `guest/display/` n'a pas
   été touché par ce lot.
+- **Preuve A sur un device virgl** : la relecture 0x0206 exigerait
+  `virtio-gpu-gl-pci` avec virgl/EGL ; le device de test (QEMU 8.2.2 sans
+  virgl) la refuse (`0x1200`). La boucle invitée→émulateur reste prouvée
+  par la preuve B (numérique).
 - **E5 réel** : la mesure de débit du flush 2D n'est pas faite ; ce lot
   n'apporte que la *commande* acceptée par le périphérique, pas la
   mesure de performance.
@@ -274,11 +506,16 @@ Distinction `[MACHINE]` / `[VM]` appliquée à ce lot :
 
 - **[MACHINE]** : la compilation `qcc` du pilote et du client de preuve,
   la construction `mkifs` de l'IFS, le verdict du script
-  `qemu/probe-driver.sh` (code de sortie 0), la relecture des en-têtes
-  QNX 8.0 (`sys/resmgr.h`, `sys/iofunc.h`, `sys/iomsg.h`, `sys/ftype.h`,
-  `sys/dispatch.h`) et de la documentation QNX 8.0 « Writing a Resource
-  Manager » (pages *Fleshing Out the Skeleton*, *Connect messages*,
-  *Combine Messages*, *Connect message types*) ;
+  `qemu/probe-driver.sh` (code de sortie 0), l'exécution complète de
+  `qemu/run-demo.sh` (code de sortie 0), l'analyse numérique de la capture
+  (Pillow), la relecture des en-têtes QNX 8.0 (`sys/resmgr.h`,
+  `sys/iofunc.h`, `sys/iomsg.h`, `sys/ftype.h`, `sys/dispatch.h`) et de la
+  documentation QNX 8.0 « Writing a Resource Manager » (pages *Fleshing Out
+  the Skeleton*, *Connect messages*, *Combine Messages*, *Connect message
+  types*, *Using the default functions*, *The iofunc_attr_t attributes
+  structure*) ;
 - **[VM]** : tout le journal série ci-dessus, donc l'énumération, la
   négociation, l'échange `GET_DISPLAY_INFO`, la création de la ressource
-  2D et la publication de `/dev/gpu0`.
+  2D, la publication de `/dev/gpu0`, **l'ouverture du nœud par un client**,
+  **la peinture et la présentation de la mire**, et le refus de la
+  relecture 0x0206 par le périphérique.
