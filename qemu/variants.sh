@@ -24,8 +24,8 @@
 
 set -u
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-PROBE="${SCRIPT_DIR}/probe-e1.sh"
+TOILE_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+PROBE="${TOILE_SCRIPT_DIR}/probe-e1.sh"
 
 VARIANTS=(virtio-gpu-pci virtio-gpu-device virtio-vga)
 

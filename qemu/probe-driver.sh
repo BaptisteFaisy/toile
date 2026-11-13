@@ -31,11 +31,11 @@
 
 set -u
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-REPO_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
+TOILE_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+TOILE_REPO_DIR=$(cd -- "${TOILE_SCRIPT_DIR}/.." && pwd)
 
 TOILE_SDP=${TOILE_SDP:-"$HOME/qnx800"}
-TOILE_BUILDFILE=${TOILE_BUILDFILE:-"${REPO_DIR}/image/toile-driver.build"}
+TOILE_BUILDFILE=${TOILE_BUILDFILE:-"${TOILE_REPO_DIR}/image/toile-driver.build"}
 TOILE_WORK=${TOILE_WORK:-/tmp/toile-driver}
 TOILE_VARIANT=${TOILE_VARIANT:-virtio-gpu-pci}
 TOILE_MEM=${TOILE_MEM:-1536}
@@ -66,11 +66,11 @@ command -v mkifs >/dev/null 2>&1 || die "mkifs absent (sourcez qnxsdp-env.sh)"
 command -v qcc >/dev/null 2>&1 || die "qcc absent (sourcez qnxsdp-env.sh)"
 
 # --- 1. compilation du pilote invité et du client ---------------------------
-DRIVER_BIN="${REPO_DIR}/guest/build/toile-gpu"
-CLIENT_BIN="${REPO_DIR}/guest/build/toile-gpu-probe"
+DRIVER_BIN="${TOILE_REPO_DIR}/guest/build/toile-gpu"
+CLIENT_BIN="${TOILE_REPO_DIR}/guest/build/toile-gpu-probe"
 if [ "${TOILE_NO_REBUILD}" != "1" ]; then
     log "compilation du pilote et du client (make -f guest/common.mk driver probe)"
-    ( cd "${REPO_DIR}/guest" && make -f common.mk driver probe ) \
+    ( cd "${TOILE_REPO_DIR}/guest" && make -f common.mk driver probe ) \
         || die "compilation qcc a échoué"
 fi
 [ -x "${DRIVER_BIN}" ] || die "binaire pilote absent: ${DRIVER_BIN}"
@@ -82,7 +82,7 @@ if [ ! -f "${IFS_IMAGE}" ] || [ "${TOILE_BUILDFILE}" -nt "${IFS_IMAGE}" ] \
     || [ "${DRIVER_BIN}" -nt "${IFS_IMAGE}" ] \
     || [ "${CLIENT_BIN}" -nt "${IFS_IMAGE}" ]; then
     log "construction de l'IFS avec mkifs (SDP ${TOILE_SDP})"
-    ( cd "${REPO_DIR}" && mkifs "${TOILE_BUILDFILE}" "${IFS_IMAGE}" ) \
+    ( cd "${TOILE_REPO_DIR}" && mkifs "${TOILE_BUILDFILE}" "${IFS_IMAGE}" ) \
         || die "mkifs a échoué"
 fi
 log "image: ${IFS_IMAGE} ($(wc -c < "${IFS_IMAGE}") octets)"

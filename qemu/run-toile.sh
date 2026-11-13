@@ -21,11 +21,11 @@
 
 set -u
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-REPO_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
+TOILE_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+TOILE_REPO_DIR=$(cd -- "${TOILE_SCRIPT_DIR}/.." && pwd)
 
 TOILE_IFS=${TOILE_IFS:-/tmp/toile.ifs}
-TOILE_BUILD=${TOILE_BUILD:-"${REPO_DIR}/image/toile.build"}
+TOILE_BUILD=${TOILE_BUILD:-"${TOILE_REPO_DIR}/image/toile.build"}
 TOILE_GPU=${TOILE_GPU:-virtio-gpu-pci}
 TOILE_MEM=${TOILE_MEM:-2048}
 TOILE_SMP=${TOILE_SMP:-4}
@@ -48,8 +48,8 @@ if [ ! -f "${TOILE_IFS}" ]; then
     . "${QNX_SDP:-$HOME/qnx800}/qnxsdp-env.sh" >/dev/null 2>&1 \
         || die "qnxsdp-env.sh introuvable (QNX_SDP=...)"
     command -v mkifs >/dev/null 2>&1 || die "mkifs absent"
-    ( cd "${REPO_DIR}" && make -f guest/common.mk ) || die "build invité échoué"
-    ( cd "${REPO_DIR}" && mkifs "${TOILE_BUILD}" "${TOILE_IFS}" ) \
+    ( cd "${TOILE_REPO_DIR}" && make -f guest/common.mk ) || die "build invité échoué"
+    ( cd "${TOILE_REPO_DIR}" && mkifs "${TOILE_BUILD}" "${TOILE_IFS}" ) \
         || die "mkifs a échoué"
 fi
 log "image : ${TOILE_IFS} ($(wc -c < "${TOILE_IFS}") octets)"
