@@ -53,6 +53,10 @@ jobs:
 
       - name: Verifier l'outillage du runner
         run: |
+          # Le runner est un service systemd utilisateur : son PATH ne contient
+          # pas toujours /usr/bin. On le fixe explicitement plutot que de
+          # dependre de l'environnement du runner.
+          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
           command -v qemu-system-x86_64 >/dev/null || { echo "::error::qemu-system-x86_64 absent du runner"; exit 1; }
           command -v python3 >/dev/null || { echo "::error::python3 absent du runner"; exit 1; }
           if [ ! -w /dev/kvm ]; then
@@ -81,6 +85,7 @@ jobs:
         if: steps.ifs.outputs.ifs_path != ''
         run: |
           set -euo pipefail
+          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
           chmod +x qemu/verify-hash.sh
           ./qemu/verify-hash.sh --ifs "${{ steps.ifs.outputs.ifs_path }}" --vnc 20
 
