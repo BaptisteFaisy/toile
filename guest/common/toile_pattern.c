@@ -21,7 +21,7 @@ int toile_pattern_fmt_is_bgra(uint32_t fmt)
     }
 }
 
-static uint32_t pattern_pack(uint32_t fmt, uint32_t r, uint32_t g, uint32_t b)
+uint32_t toile_pattern_pack(uint32_t fmt, uint32_t r, uint32_t g, uint32_t b)
 {
     if (toile_pattern_fmt_is_bgra(fmt))
         return (r << 16) | (g << 8) | b; /* word bytes: B,G,R,X on LE */
@@ -67,7 +67,7 @@ static uint32_t pattern_color(uint32_t fmt, uint32_t x, uint32_t y,
             b = 0xE0u;
         }
     }
-    return pattern_pack(fmt, r, g, b);
+    return toile_pattern_pack(fmt, r, g, b);
 }
 
 void toile_pattern_paint(void *pixels, uint32_t stride,

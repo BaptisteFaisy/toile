@@ -36,9 +36,9 @@
   <h1>Live guest</h1>
   <p class="lede">A QNX 8.0 guest is <strong>really running right now</strong>, on the
   <code>pc</code> host. Inside it, the Toile driver enumerates the <code>virtio-gpu</code>,
-  publishes <code>/dev/gpu0</code>, and a client paints the test pattern through the device.
-  This page reads that guest live — the screen is re-captured every two seconds, the serial
-  console below is the real boot log.</p>
+  publishes <code>/dev/gpu0</code>, and a client paints an animated plasma through the device
+  at ~30 frames per second. This page reads that guest live — the screen is re-captured
+  every second, the serial console below is the real boot log.</p>
 
   <div class="live-grid">
     <div class="panel">
@@ -55,13 +55,17 @@
 
   <h2>What you are looking at</h2>
   <ul>
-    <li>The <strong>colour bars, greyscale ramp and 16-px checkerboard</strong> are the Toile test pattern, painted <em>inside</em>
-    the guest (<code>guest/common/toile_pattern.c</code>) and flushed to the <code>virtio-gpu</code>
-    scanout — QEMU renders it, and this page re-captures it via the QEMU monitor
-    (<code>screendump</code>).</li>
+    <li>The <strong>moving plasma</strong> is painted by an ordinary client <em>inside</em> the
+    guest (<code>guest/common/toile_anim.c</code>): it opens <code>/dev/gpu0</code>, maps the
+    framebuffer, writes pixels, and pushes every frame with
+    <code>TRANSFER_TO_HOST_2D</code> + <code>RESOURCE_FLUSH</code>. QEMU renders it, and this page
+    re-captures it through the QEMU monitor (<code>screendump</code>) once per second.</li>
+    <li>The <strong>frame counter</strong> (bottom left) and the <strong>FPS</strong> (bottom
+    right) are drawn by the guest, not by this page: if the guest stopped painting, both would
+    freeze.</li>
     <li>The console shows the real boot sequence: <code>TOILE: virtio-gpu trouve (1af4/1050)</code>,
-    <code>TOILE: /dev/gpu0 pret</code>, <code>CLIENT: /dev/gpu0 ouvert (fd=3)</code>,
-    <code>CLIENT: mire peinte et presentee</code>.</li>
+    <code>TOILE: /dev/gpu0 pret</code>, <code>CLIENT: /dev/gpu0 ouvert (fd=3)</code>, then
+    <code>ANIM: 151 images, 30.2 im/s, present_ko=0</code>.</li>
     <li>There is <strong>no keyboard interaction</strong> yet: virtio-input is one of the
     explicitly-open items — the guest has no input path, so the screen does not react to keys.</li>
   </ul>
@@ -103,7 +107,7 @@
   refreshConsole();
   refreshScreen();
   setInterval(refreshConsole, 2000);
-  setInterval(refreshScreen, 2000);
+  setInterval(refreshScreen, 1000);
 </script>
 <script src="assets/site.js"></script>
 </body>

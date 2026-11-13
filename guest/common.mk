@@ -70,6 +70,9 @@ COMMON_SRCS    := toile_pattern.c
 VIRTIO_SRCS    := toile_transport.c
 # Client de preuve /dev/gpu0 (essai « le pilote démarre dans l'invité »).
 PROBE_SRCS     := toile_gpu_probe.c
+# Vitrine live : peintre animé (plasma) + son client /dev/gpu0.
+ANIM_SRCS      := toile_anim.c
+ANIM_MAIN_SRCS := toile_anim_main.c
 
 # Couche commune Passerelle : seul log.c est nécessaire ici (pgw_log_write,
 # pgw_stat_add).
@@ -81,19 +84,23 @@ GPU_OBJS       := $(addprefix $(BUILD)/gpu/,$(GPU_SRCS:.c=.o))
 COMMON_OBJS    := $(addprefix $(BUILD)/common/,$(COMMON_SRCS:.c=.o))
 VIRTIO_OBJS    := $(addprefix $(BUILD)/virtio/,$(VIRTIO_SRCS:.c=.o))
 PROBE_OBJS     := $(addprefix $(BUILD)/common/,$(PROBE_SRCS:.c=.o))
+ANIM_OBJS      := $(addprefix $(BUILD)/common/,$(ANIM_SRCS:.c=.o))
+ANIM_MAIN_OBJS := $(addprefix $(BUILD)/common/,$(ANIM_MAIN_SRCS:.c=.o))
 
 DRIVER_BIN     := $(BUILD)/toile-gpu
 DISPLAY_BIN    := $(BUILD)/toile-display
 INPUT_BIN      := $(BUILD)/toile-input
 PROBE_BIN      := $(BUILD)/toile-gpu-probe
+ANIM_BIN       := $(BUILD)/toile-anim
 
-.PHONY: all driver display input probe patch clean dirs
-all: driver display input probe
+.PHONY: all driver display input probe anim patch clean dirs
+all: driver display input probe anim
 
 driver: $(DRIVER_BIN)
 display: $(DISPLAY_BIN)
 input: $(INPUT_BIN)
 probe: $(PROBE_BIN)
+anim: $(ANIM_BIN)
 
 # --- préparation : copie du transport Passerelle + patch -------------------
 patch: $(PATCH_STAMP)
@@ -148,6 +155,12 @@ $(INPUT_BIN): $(BUILD)/input/toile_input.o $(VIRTIO_OBJS) $(PGW_OBJS)
 
 # Client de preuve /dev/gpu0 : ouvre le noeud et interroge le pilote.
 $(PROBE_BIN): $(PROBE_OBJS) $(BUILD)/common/toile_gpu_client.o
+	@mkdir -p $(dir $@)
+	$(CC) -V $(TOILE_VARIANT) $^ -o $@
+
+# Vitrine live : le client anime le framebuffer (mmap + present).
+$(ANIM_BIN): $(ANIM_MAIN_OBJS) $(ANIM_OBJS) $(BUILD)/common/toile_gpu_client.o \
+             $(BUILD)/common/toile_pattern.o
 	@mkdir -p $(dir $@)
 	$(CC) -V $(TOILE_VARIANT) $^ -o $@
 

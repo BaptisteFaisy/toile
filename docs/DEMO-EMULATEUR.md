@@ -11,8 +11,9 @@ retrouve la mire.
 ## La vitrine live (voir la boucle en fonctionnement)
 
 - invité : QNX 8.0 sous QEMU 8.2.2, `-vga none -device virtio-gpu-pci -vnc :12`,
-  IFS construit depuis `guest/` — le pilote publie `/dev/gpu0`, un client
-  ordinaire l'ouvre, peint la mire et la présente ;
+  image `image/toile-vitrine.build` construite depuis `guest/` — le pilote
+  publie `/dev/gpu0`, le client de preuve ouvre le nœud, puis un client animé
+  peint un plasma en continu ;
 - vitrine : `qnx-emu/web.py` lit l'écran par `screendump` sur le moniteur QEMU
   et la console par le journal série ;
 - unités systemd fournies dans `qemu/systemd/` :
@@ -25,6 +26,32 @@ systemctl --user enable --now toile-qemu.service toile-web.service
   (`tailscale funnel --set-path=/toile http://127.0.0.1:8111`) ;
 - page du site : `site/emulator-live.html` (écran + console, rafraîchis toutes
   les 2 s).
+
+## L'invité qui peint en continu (30 im/s)
+
+`toile-anim` (`guest/common/toile_anim_main.c`) est un client ordinaire du
+nœud : il ouvre `/dev/gpu0`, lit le descripteur de framebuffer
+(`DCMD_TOILE_GPU_FB`), mappe la mémoire physique (`mmap` `MAP_PHYS`, `NOFD`),
+peint un plasma (`guest/common/toile_anim.c` : palette glace → feu, vignette,
+police 5×7 pour le mot-symbole, le compteur d'images et le FPS) et présente
+chaque image (`DCMD_TOILE_GPU_PRESENT` → `TRANSFER_TO_HOST_2D` +
+`RESOURCE_FLUSH`).
+
+Mesuré dans l'invité, sur la console série :
+
+```
+ANIM: /dev/gpu0 ouvert (fd=3)
+ANIM: framebuffer mappe 1280x800 stride=5120 fmt=2, plasma a 30 im/s
+ANIM: 151 images, 30.2 im/s, present_ko=0, t=5005 ms
+ANIM: 451 images, 30.1 im/s, present_ko=0, t=15008 ms
+```
+
+- deux captures `screendump` à 1,5 s d'écart **diffèrent** (le framebuffer
+  change vraiment) ;
+- le compteur et le FPS sont dessinés **par l'invité** : page figée ⇒ invité
+  figé ;
+- aucune image n'est fabriquée côté hôte : la page ne fait que recapturer
+  l'écran de QEMU.
 
 ## Méthode (une commande, sans vitrine)
 

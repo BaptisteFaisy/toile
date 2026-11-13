@@ -4,9 +4,14 @@
 # périphérique `virtio-gpu-pci` : l'invité doit voir le device virtio-gpu
 # (1af4/1050), c'est lui que le pilote Toile pilote (guest/gpu/).
 #
+# L'image servie est celle de la VITRINE (image/toile-vitrine.build) : le
+# pilote publie /dev/gpu0, le client de preuve ouvre le nœud, puis
+# `toile-anim` peint un plasma en continu à ~30 im/s.  L'image de sonde
+# (image/toile-driver.build, ifs.bin) reste celle de qemu/probe-driver.sh.
+#
 # L'affichage est servi par VNC (sans serveur X) : `screendump` sur le
-# moniteur rend alors l'image de l'écran VGA de l'invité — c'est ce que lit
-# la vitrine HTTP (toile-web.service).
+# moniteur rend alors l'image de l'écran de l'invité — c'est ce que lit la
+# vitrine HTTP (toile-web.service).
 #
 # Les chemins doivent être IDENTIQUES à ceux de l'unité web jumelle
 # (toile-web.service) : --serie, --moniteur.
@@ -14,13 +19,13 @@
 # NOTE — %h n'est PAS développé dans Environment= (systemd) : les chemins y
 # sont en absolu ; %h ne marche que dans ExecStart.
 [Unit]
-Description=Invité QNX 8.0 — Toile (QEMU, pilote virtio-gpu)
+Description=Invité QNX 8.0 — Toile (QEMU, pilote virtio-gpu, vitrine animée)
 After=network.target
 
 [Service]
 Type=simple
 ExecStart=%h/Bureau/toile/qemu/toile-vitrine.sh \
-    --ifs %h/Bureau/toile-demo/ifs.bin \
+    --ifs %h/Bureau/toile-demo/vitrine.ifs \
     --serie %h/Bureau/toile-demo/serial.log \
     --moniteur %h/Bureau/toile-demo/mon.sock \
     --vnc 12 --memoire 1536

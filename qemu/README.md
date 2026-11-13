@@ -16,10 +16,11 @@ E1 le 2026-11-12, la boucle invité → émulateur le 2026-11-13.
 ## La vitrine live (poste `pc`)
 
 ```sh
-# 1. (une fois) l'image invitée QNX 8.0, construite depuis guest/ ;
-#    l'IFS produit par la sonde (toile-driver.ifs) est celui que sert la vitrine
-TOILE_WORK=$HOME/Bureau/toile-demo ./qemu/probe-driver.sh
-cp "$HOME/Bureau/toile-demo/toile-driver.ifs" "$HOME/Bureau/toile-demo/ifs.bin"
+# 1. l'image de la vitrine (pilote + client animé), construite depuis guest/
+source ~/qnx800/qnxsdp-env.sh
+make -f guest/common.mk anim
+mkifs image/toile-vitrine.build "$HOME/Bureau/toile-demo/vitrine.ifs"
+#    (l'image de SONDE, elle, reste celle de qemu/probe-driver.sh : ifs.bin)
 # 2. les services utilisateur (unités fournies dans qemu/systemd/)
 cp qemu/systemd/toile-{qemu,web}.service ~/.config/systemd/user/
 systemctl --user daemon-reload
