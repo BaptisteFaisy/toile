@@ -85,12 +85,18 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ vars.GUEST_IFS_TAG || 'guest-ifs-latest' }}"
-          mkdir -p "$RUNNER_TEMP/toile-ifs"
-          if gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
-               --pattern 'toile-guest.ifs' --dir "$RUNNER_TEMP/toile-ifs" 2>/dev/null; then
-            echo "ifs_path=$RUNNER_TEMP/toile-ifs/toile-guest.ifs" >> "$GITHUB_OUTPUT"
+          DIR="$RUNNER_TEMP/toile-ifs"
+          mkdir -p "$DIR"
+          URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
+                 | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if a['name']=='toile-guest.ifs'))" \
+                 2>/dev/null || true)
+          if [ -n "$URL" ]; then
+            curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -o "$DIR/toile-guest.ifs" "$URL"
+            echo "ifs_path=$DIR/toile-guest.ifs" >> "$GITHUB_OUTPUT"
             echo "ifs_tag=$TAG" >> "$GITHUB_OUTPUT"
-            echo "image IFS telechargee ($TAG)"
+            echo "image IFS telechargee ($TAG) : $(stat -c %s "$DIR/toile-guest.ifs") octets"
           else
             echo "::warning::aucune release '$TAG' avec l'asset toile-guest.ifs : la preuve C est sautee (publier une image avec qemu/publish-ifs.sh)"
             echo "ifs_path=" >> "$GITHUB_OUTPUT"
