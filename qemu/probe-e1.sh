@@ -26,11 +26,11 @@
 
 set -u
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-REPO_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
+TOILE_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+TOILE_REPO_DIR=$(cd -- "${TOILE_SCRIPT_DIR}/.." && pwd)
 
 TOILE_SDP=${TOILE_SDP:-"$HOME/qnx800"}
-TOILE_BUILDFILE=${TOILE_BUILDFILE:-"${REPO_DIR}/image/toile-e1.build"}
+TOILE_BUILDFILE=${TOILE_BUILDFILE:-"${TOILE_REPO_DIR}/image/toile-e1.build"}
 TOILE_WORK=${TOILE_WORK:-/tmp/toile-e1}
 TOILE_VARIANT=${TOILE_VARIANT:-virtio-gpu-pci}
 TOILE_MEM=${TOILE_MEM:-1536}
@@ -54,7 +54,7 @@ if [ ! -f "${IFS_IMAGE}" ] || [ "${TOILE_BUILDFILE}" -nt "${IFS_IMAGE}" ]; then
     # shellcheck disable=SC1091
     . "${TOILE_SDP}/qnxsdp-env.sh" >/dev/null 2>&1 || die "qnxsdp-env.sh introuvable"
     command -v mkifs >/dev/null 2>&1 || die "mkifs absent (sourcez qnxsdp-env.sh)"
-    ( cd "${REPO_DIR}" && mkifs "${TOILE_BUILDFILE}" "${IFS_IMAGE}" ) \
+    ( cd "${TOILE_REPO_DIR}" && mkifs "${TOILE_BUILDFILE}" "${IFS_IMAGE}" ) \
         || die "mkifs a échoué"
 fi
 log "image: ${IFS_IMAGE} ($(wc -c < "${IFS_IMAGE}") octets)"

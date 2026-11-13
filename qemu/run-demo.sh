@@ -31,8 +31,8 @@
 
 set -u
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-REPO_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
+TOILE_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+TOILE_REPO_DIR=$(cd -- "${TOILE_SCRIPT_DIR}/.." && pwd)
 
 TOILE_SDP=${TOILE_SDP:-"$HOME/qnx800"}
 TOILE_WORK=${TOILE_WORK:-/tmp/toile-demo}
@@ -40,7 +40,7 @@ TOILE_VARIANT=${TOILE_VARIANT:-virtio-gpu-pci}
 TOILE_DISPLAY=${TOILE_DISPLAY:-vnc}
 TOILE_TIMEOUT=${TOILE_TIMEOUT:-120}
 TOILE_MEM=${TOILE_MEM:-1536}
-TOILE_PROOF_DIR=${TOILE_PROOF_DIR:-"${REPO_DIR}/docs/preuves"}
+TOILE_PROOF_DIR=${TOILE_PROOF_DIR:-"${TOILE_REPO_DIR}/docs/preuves"}
 TOILE_PROOF_NAME=${TOILE_PROOF_NAME:-"toile-mire-client-1280x800.png"}
 TOILE_SHOT="${TOILE_WORK}/toile-shot.png"
 
@@ -79,7 +79,7 @@ TOILE_DISPLAY="${TOILE_DISPLAY}" \
 TOILE_TIMEOUT="${TOILE_TIMEOUT}" \
 TOILE_MEM="${TOILE_MEM}" \
 TOILE_SHOT="${TOILE_SHOT}" \
-    "${SCRIPT_DIR}/probe-driver.sh"
+    "${TOILE_SCRIPT_DIR}/probe-driver.sh"
 RC=$?
 set -e
 
