@@ -60,9 +60,10 @@
     <tr>
       <td>The FNV-1a hash published by the guest equals the hash recomputed from the emulator's
       own screenshot.</td>
-      <td><strong>The live guest is a demo.</strong> An unrelated process on the workstation kills
-      it every 1&ndash;2 minutes; systemd restarts it within 10&nbsp;s, so the showcase works but
-      has holes.</td>
+      <td><strong>The live guest is a demo.</strong> Its QEMU used to be killed every
+      1&ndash;2&nbsp;minutes while it was launched outside systemd; it now runs under a systemd
+      user unit and has stayed up since. The exact origin of the earlier SIGTERMs was never
+      established.</td>
     </tr>
     <tr>
       <td>The virtio-input keyboard path: a real key reaches the guest, updates the shared
@@ -111,9 +112,12 @@
 
   <h3>The live guest is a demo</h3>
   <p>The guest shown on the <a href="emulator-live.html">live page</a> runs on a developer
-  workstation. An unrelated process there kills the virtual machine every one or two minutes;
-  systemd restarts it within about 10&nbsp;s. The showcase therefore works, with holes: for a few
-  seconds the page has no screen to show. It is a demonstration environment, not a service.</p>
+  workstation, supervised by the systemd user unit <code>toile-qemu.service</code>. While the
+  virtual machine was launched outside systemd it was killed every one or two minutes by a
+  process that was never identified; since it is supervised by systemd it has stayed up for
+  hours, while another project on the same machine keeps restarting its own guest on purpose.
+  The showcase is still a demonstration environment, not a service: it lives on a workstation
+  that also runs memory-hungry jobs.</p>
 
   <h3>The showcase samples the screen, the guest paints it</h3>
   <p>The web showcase reads the emulator screen through the QEMU monitor
