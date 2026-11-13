@@ -23,6 +23,11 @@ IFS_BIN=""
 VNC_NUM=14
 MEM=1536
 QEMU="${TOILE_QEMU:-$(command -v qemu-system-x86_64 || true)}"
+# Repli : un runner en service systemd utilisateur peut avoir un PATH
+# minimal (/usr/bin absent). Le binaire est alors cherche a sa place.
+if [ -z "${QEMU}" ] && [ -x /usr/bin/qemu-system-x86_64 ]; then
+    QEMU=/usr/bin/qemu-system-x86_64
+fi
 PYTHON="${TOILE_PYTHON:-$(command -v python3 || true)}"
 
 while [ "$#" -gt 0 ]; do

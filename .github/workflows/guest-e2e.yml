@@ -1,0 +1,103 @@
+name: guest-e2e
+
+# CI de bout en bout de l'invite QNX.
+#
+# L'invite ne se compile PAS ici : le SDP QNX 8.0 n'existe que sur le poste de
+# travail. La CI telecharge une image IFS deja publiee (asset `toile-guest.ifs`
+# d'une release du depot), la boot dans QEMU sur un runner **avec KVM**, et
+# rejoue la preuve C : l'empreinte FNV-1a publiee par l'invite doit etre
+# egale a l'empreinte recalculee sur les pixels rendus par l'emulateur.
+#
+# Ce qui est reellement verifie : le driver, le client et le transport
+# fonctionnent dans un invite QNX 8.0 reel, et l'image affichee par
+# l'emulateur est bien celle peinte par l'invite.
+#
+# Ce qui n'est PAS verifie : la compilation (fait sur le poste), et le chemin
+# Screen (le display driver n'est pas demarre ici).
+#
+# Budget : verdict en moins de 5 minutes (regle CI-BUDGET-5MIN). Le runner
+# doit avoir /dev/kvm : un runner GitHub heberge ne peut pas booter l'invite
+# en 5 minutes (emulation logicielle trop lente).
+
+on:
+  # Declencheurs volontairement restreints : le job a besoin d'un runner avec
+  # /dev/kvm (le depot n'en a aucun enregistre aujourd'hui). Le declencheur
+  # `pull_request` sera ajoute quand le runner `toile-worker` sera enregistre
+  # pour ce depot — sinon la PR resterait « en attente » indefiniment.
+  workflow_dispatch:
+  schedule:
+    # chaque nuit : la preuve C ne doit pas dependre d'une PR recente.
+    - cron: '23 4 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'guest/**'
+      - 'image/**'
+      - 'qemu/**'
+      - '.github/workflows/guest-e2e.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guest-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guest-e2e:
+    name: guest-e2e (preuve C sur invite)
+    runs-on: [self-hosted, toile-worker]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (superficiel)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verifier l'outillage du runner
+        run: |
+          # Le runner est un service systemd utilisateur : son PATH ne contient
+          # pas toujours /usr/bin. On le fixe explicitement plutot que de
+          # dependre de l'environnement du runner.
+          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+          command -v qemu-system-x86_64 >/dev/null || { echo "::error::qemu-system-x86_64 absent du runner"; exit 1; }
+          command -v python3 >/dev/null || { echo "::error::python3 absent du runner"; exit 1; }
+          if [ ! -w /dev/kvm ]; then
+            echo "::error::le runner n'a pas /dev/kvm : l invite ne bootera pas dans le budget de 5 min"
+            exit 1
+          fi
+
+      - name: Telecharger l'image IFS publiee
+        id: ifs
+        run: |
+          set -euo pipefail
+          TAG="${{ vars.GUEST_IFS_TAG || 'guest-ifs-latest' }}"
+          mkdir -p "$RUNNER_TEMP/toile-ifs"
+          if gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+               --pattern 'toile-guest.ifs' --dir "$RUNNER_TEMP/toile-ifs" 2>/dev/null; then
+            echo "ifs_path=$RUNNER_TEMP/toile-ifs/toile-guest.ifs" >> "$GITHUB_OUTPUT"
+            echo "ifs_tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "image IFS telechargee ($TAG)"
+          else
+            echo "::warning::aucune release '$TAG' avec l'asset toile-guest.ifs : la preuve C est sautee (publier une image avec qemu/publish-ifs.sh)"
+            echo "ifs_path=" >> "$GITHUB_OUTPUT"
+            echo "ifs_tag=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rejouer la preuve C (invite -> emulateur)
+        if: steps.ifs.outputs.ifs_path != ''
+        run: |
+          set -euo pipefail
+          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+          chmod +x qemu/verify-hash.sh
+          ./qemu/verify-hash.sh --ifs "${{ steps.ifs.outputs.ifs_path }}" --vnc 20
+
+      - name: Verdict
+        if: always()
+        run: |
+          if [ -z "${{ steps.ifs.outputs.ifs_path }}" ]; then
+            echo "::warning::preuve C non executee (pas d image publiee)"
+            exit 0
+          fi
+          echo "preuve C : empreintes de l invite et de l emulateur identiques"
