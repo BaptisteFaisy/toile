@@ -61,6 +61,22 @@ typedef struct toile_gpu_rect {
 /* Paint the built-in static test pattern (mire) and present it. */
 #define DCMD_TOILE_GPU_MIRE    __DIOF(_DCMD_MISC, 0x53, uint32_t)
 
+/* Shared animation state (palette, speed, pause) of the demo clients.
+ * GET reads it, SET writes it: the keyboard driver is the only writer, the
+ * painters are readers, so no client keeps a private copy. */
+typedef struct toile_anim_cfg {
+    uint32_t magic;   /* TOILE_ANIM_MAGIC */
+    uint32_t palette; /* 0..TOILE_ANIM_PALETTES-1 */
+    uint32_t speed;   /* 1..8 */
+    uint32_t paused;  /* 0 = running, 1 = frozen */
+} toile_anim_cfg_t;
+
+#define TOILE_ANIM_MAGIC 0x70016E75u /* 'p','n','u' + version */
+#define TOILE_ANIM_PALETTES 3u
+
+#define DCMD_TOILE_GPU_ANIM_GET __DIOF(_DCMD_MISC, 0x54, toile_anim_cfg_t)
+#define DCMD_TOILE_GPU_ANIM_SET __DIOT(_DCMD_MISC, 0x55, toile_anim_cfg_t)
+
 #ifdef __cplusplus
 }
 #endif

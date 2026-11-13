@@ -1,0 +1,144 @@
+# Toile — image/toile-verify.build
+#
+# Image de la PREUVE C : un seul client peint, publie l'empreinte FNV-1a de
+# son framebuffer sur la console série, puis TIENT l'image 1,2 s.  L'hôte
+# capture pendant la tenue et recalcule la même empreinte sur les pixels
+# rendus par QEMU (qemu/verify-hash.sh).  C'est le contrôle croisé
+# invité -> émulateur, sans dépendre d'une commande de lecture du GPU (le
+# virtio-gpu 2D n'en a pas).
+#
+# Différence avec image/toile-driver.build (preuve E6, inchangée) : le client
+# de preuve `toile-gpu-probe` ouvre toujours /dev/gpu0 et peint la mire (les
+# marqueurs CLIENT: restent dans la console série), puis `toile-anim` prend
+# la main.  L'image de sonde reste utilisée par qemu/probe-driver.sh : ses
+# vérifications numériques de la mire restent valables, elles ne voient jamais
+# le plasma.
+#
+# Construction (SDP QNX 8.0 installé) :
+#   source ~/qnx800/qnxsdp-env.sh
+#   make -f guest/common.mk anim            # produit guest/build/toile-anim
+#   mkifs image/toile-vitrine.build ~/Bureau/toile-demo/vitrine.ifs
+
+[search=${QNX_TARGET}/x86_64/boot/sys:${QNX_TARGET}/x86_64/bin:${QNX_TARGET}/x86_64/sbin:${QNX_TARGET}/x86_64/usr/bin:${QNX_TARGET}/x86_64/usr/sbin:${QNX_TARGET}/x86_64/usr/lib:${QNX_TARGET}/x86_64/lib:${QNX_TARGET}/x86_64/lib/dll/pci:guest/build]
+
+[virtual=x86_64,multiboot] boot = {
+    startup-x86 -D8250..115200
+    PATH=/proc/boot
+    LD_LIBRARY_PATH=/proc/boot
+    [+keeplinked] procnto-smp-instr -mr -d 022 -u 066
+}
+
+[+script] startup-script = {
+    TERM=qansi
+    HOME=/proc/boot
+    PCI_BKWD_COMPAT_MODULE=/proc/boot/pci_bkwd_compat.so
+    PCI_SLOG_MODULE=pci_slog2.so
+    PCI_DEBUG_MODULE=pci_debug2.so
+    PCI_CAP_MODULE_DIR=/proc/boot
+    devc-ser8250 -e
+    pci-server --aspace-enable --config=/proc/boot/pci_server.cfg
+    waitfor /dev/pci/server_id_1
+    # La startup-script n'a pas d'integrateur `echo` : le script de sonde
+    # est donc lance par ksh (builtin echo disponible).
+    ksh /proc/boot/probe.sh
+    on -d -t /dev/ser1 ksh -l
+}
+
+# --- configuration du serveur PCI ------------------------------------------
+# Contenu repris de l'image QNX Everywhere (QSTI) installée dans le SDP :
+# output/build/ifs.build de ~/qnx800/images/qemu (relu le 2026-11-12).
+[type=file] /proc/boot/pci_server.cfg = {
+    [buscfg]
+    DO_BUS_CONFIG=no
+
+    [envars]
+    PCI_DEBUG_MODULE=pci_debug2.so
+    PCI_HW_MODULE=pci_hw-Intel_x86.so
+    PCI_HW_CONFIG_FILE=/proc/boot/pci_hw.cfg
+}
+
+[type=file] /proc/boot/pci_hw.cfg = {
+    [interrupts]
+    B0:D17:F0    A    18
+    B0:D17:F0    B    19
+    B0:D17:F0    C    16
+    B0:D17:F0    D    17
+    B3:D0:F0     A    18
+    B3:D0:F0     B    19
+    B3:D0:F0     C    16
+    B3:D0:F0     D    17
+}
+
+# --- binaires ------------------------------------------------------------
+ksh
+on
+waitfor
+devc-ser8250
+pci-server
+pci-tool
+devinfo
+pidin
+[+keeplinked perms=0755 uid=0 gid=0] toile-gpu
+# Le témoin indépendant : il ouvre /dev/gpu0 et peint la mire (console).
+[+keeplinked perms=0755 uid=0 gid=0] toile-gpu-probe
+# Le peintre animé de la vitrine (plasma + compteur d'images).
+[+keeplinked perms=0755 uid=0 gid=0] toile-anim
+# Clavier : virtio-input -> état partagé (palette, vitesse, pause).
+[+keeplinked perms=0755 uid=0 gid=0] toile-input
+
+# --- modules PCI ----------------------------------------------------------
+pci_bkwd_compat.so
+pci_slog2.so
+pci_debug2.so
+pci_hw-Intel_x86.so
+pci_cap-0x01.so
+pci_cap-0x04.so
+pci_cap-0x05.so
+pci_cap-0x07.so
+pci_cap-0x09-ffffffff.so
+pci_cap-0x0d.so
+pci_cap-0x10.so
+pci_cap-0x10-16c3abcd.so
+pci_cap-0x10-19570400.so
+pci_cap-0x11.so
+pci_cap-0x11-ffffffff.so
+pci_cap-0x12.so
+pci_cap-0x13.so
+pcie_xcap-0x0001.so
+pcie_xcap-0x0003.so
+pcie_xcap-0x000b-ffffffff.so
+pcie_xcap-0x0015.so
+
+# --- bibliothèques partagées (ELIBACC 83 sinon) ---------------------------
+ldqnx-64.so.2
+libc.so.6
+libgcc_s.so.1
+libsecpol.so.1
+libpci.so.3.0
+libsocket.so.4
+
+[type=link] /usr/lib/ldqnx-64.so.2=/proc/boot/ldqnx-64.so.2
+[type=link] /lib/libc.so.6=/proc/boot/libc.so.6
+[type=link] /lib/libgcc_s.so.1=/proc/boot/libgcc_s.so.1
+[type=link] /lib/libsecpol.so.1=/proc/boot/libsecpol.so.1
+[type=link] /lib/libpci.so.3.0=/proc/boot/libpci.so.3.0
+[type=link] /lib/libsocket.so.4=/proc/boot/libsocket.so.4
+
+# --- script de démarrage ----------------------------------------------------
+# 1. le pilote publie /dev/gpu0 ;
+# 2. le client de preuve l'ouvre, peint la mire, la présente (lignes CLIENT:) ;
+# 3. le client animé prend la main : la vitrine montre un plasma vivant.
+[type=file] /proc/boot/probe.sh = {
+    #!/bin/ksh
+    echo "=== TOILE_DRIVER_PROBE_BEGIN ==="
+    /proc/boot/toile-gpu &
+    echo "--- client /dev/gpu0 ---"
+    /proc/boot/toile-gpu-probe
+    echo "client rc=$?"
+    # PREUVE C : un client, empreinte publiée puis image tenue 1,2 s.
+    echo "--- preuve C : hash + tenue ---"
+    /proc/boot/toile-anim --hash-hold &
+    echo "--- pidin ---"
+    pidin
+    echo "=== TOILE_DRIVER_PROBE_END ==="
+}

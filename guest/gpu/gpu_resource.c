@@ -133,11 +133,24 @@ int gpu_present(gpu_ctx *g, toile_rect rect)
     if (g == NULL || !g->ready)
         return TOILE_CMD_INVALID;
     toile_rect r = gpu_rect_or_full(g, rect);
+    if (r.x >= g->width || r.y >= g->height)
+        return TOILE_CMD_INVALID;
+    if (r.x + r.w > g->width)
+        r.w = g->width - r.x;
+    if (r.y + r.h > g->height)
+        r.h = g->height - r.y;
+    /* Le transfert 2D décrit une région LINÉAIRE du tampon attaché : l'offset
+     * est la position du rectangle dans la ressource (y * stride + x * bpp),
+     * sans quoi un sous-rectangle recopie le début du framebuffer (bug
+     * trouvé avec la mire de trois zones, 2026-11-13). */
+    uint32_t bpp = toile_fmt_bpp((toile_fmt)g->format);
+    if (bpp == 0u)
+        return TOILE_CMD_INVALID;
     toile_cmd cmd;
     gpu_cmd_init(&cmd, TOILE_VG_CMD_TRANSFER_TO_HOST_2D);
     cmd.u.xfer.resource_id = GPU_RES_SCANOUT;
     cmd.u.xfer.rect = r;
-    cmd.u.xfer.offset = 0u;
+    cmd.u.xfer.offset = (uint64_t)r.y * g->fb.stride + (uint64_t)r.x * bpp;
     int rc = gpu_cmd_simple(g, &cmd);
     if (rc != TOILE_OK && rc != TOILE_TRANSFER_OK)
         return rc;

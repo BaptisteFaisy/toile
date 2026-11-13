@@ -45,6 +45,9 @@ static resmgr_attr_t g_rattr;
 static resmgr_connect_funcs_t g_connect_funcs;
 static resmgr_io_funcs_t g_io_funcs;
 
+/* Etat partage de l'animation (la vitrine, pilotee au clavier). */
+static toile_anim_cfg_t g_anim = {TOILE_ANIM_MAGIC, 0u, 1u, 0u};
+
 /* FNV-1a 64 bits : empreinte du framebuffer, pour comparer avant/après une
  * relecture hôte->invité (preuve numérique A). */
 static uint64_t gpu_fb_hash(const void *data, size_t len)
@@ -93,6 +96,76 @@ static void gpu_readback_probe(gpu_ctx *g)
                          : (before == after ? "IDENTIQUES" : "DIFFERENTES"));
 }
 
+/* DCMD_TOILE_GPU_INFO : description de la carte. */
+static int gpu_devctl_info(gpu_ctx *g, void *payload, uint32_t *nbytes_out)
+{
+    gpu_fill_info(g, (toile_gpu_info_t *)payload);
+    *nbytes_out = sizeof(toile_gpu_info_t);
+    return EOK;
+}
+
+/* DCMD_TOILE_GPU_FB : descripteur du framebuffer (adresse physique). */
+static int gpu_devctl_fb(gpu_ctx *g, void *payload, uint32_t *nbytes_out)
+{
+    toile_gpu_fb_t *fb = (toile_gpu_fb_t *)payload;
+    fb->paddr = g->fb.pa;
+    fb->bytes = g->fb.bytes;
+    fb->stride = g->fb.stride;
+    fb->format = g->format;
+    fb->width = g->width;
+    fb->height = g->height;
+    *nbytes_out = sizeof(*fb);
+    return EOK;
+}
+
+/* DCMD_TOILE_GPU_PRESENT : presente la surface (rectangle optionnel). */
+static int gpu_devctl_present(gpu_ctx *g, io_devctl_t *msg)
+{
+    toile_gpu_rect_t r;
+    memset(&r, 0, sizeof(r));
+    if (msg->i.nbytes == sizeof(r))
+        memcpy(&r, _IO_INPUT_PAYLOAD(msg), sizeof(r));
+    toile_rect rect = {r.x, r.y, r.w, r.h};
+    return gpu_present(g, rect) == TOILE_OK ? EOK : EIO;
+}
+
+/* DCMD_TOILE_GPU_ANIM_GET : etat d'animation partage (lecture). */
+static int gpu_devctl_anim_get(void *payload, uint32_t *nbytes_out)
+{
+    *(toile_anim_cfg_t *)payload = g_anim;
+    *nbytes_out = sizeof(g_anim);
+    return EOK;
+}
+
+/* DCMD_TOILE_GPU_ANIM_SET : etat d'animation partage (ecriture). */
+static int gpu_devctl_anim_set(void *payload, uint32_t nbytes)
+{
+    toile_anim_cfg_t in;
+    if (nbytes != sizeof(in))
+        return EINVAL;
+    memcpy(&in, payload, sizeof(in));
+    if (in.palette >= 3u || in.speed < 1u || in.speed > 8u)
+        return EINVAL;
+    g_anim = in;
+    g_anim.magic = TOILE_ANIM_MAGIC;
+    gpu_log(g_gpu, "anim: palette=%u speed=%u paused=%u",
+            (unsigned)g_anim.palette, (unsigned)g_anim.speed,
+            (unsigned)g_anim.paused);
+    return EOK;
+}
+
+/* DCMD_TOILE_GPU_MIRE : mire statique + relecture numerique (preuve A). */
+static int gpu_devctl_mire(gpu_ctx *g, void *payload, uint32_t *nbytes_out)
+{
+    gpu_paint_mire(&g->fb, g->width, g->height, g->format);
+    (void)gpu_present(g, (toile_rect){0u, 0u, 0u, 0u});
+    gpu_readback_probe(g);
+    *(uint32_t *)payload = 0u;
+    *nbytes_out = sizeof(uint32_t);
+    return EOK;
+}
+
+/* Aiguillage devctl : chaque DCMD a son helper (garde de taille). */
 static int gpu_devctl_handle(resmgr_context_t *ctp, io_devctl_t *msg,
                              uint32_t *nbytes_out)
 {
@@ -101,37 +174,17 @@ static int gpu_devctl_handle(resmgr_context_t *ctp, io_devctl_t *msg,
     *nbytes_out = 0u;
     switch (msg->i.dcmd) {
     case DCMD_TOILE_GPU_INFO:
-        gpu_fill_info(g_gpu, (toile_gpu_info_t *)payload);
-        *nbytes_out = sizeof(toile_gpu_info_t);
-        return EOK;
-    case DCMD_TOILE_GPU_FB: {
-        toile_gpu_fb_t *fb = (toile_gpu_fb_t *)payload;
-        fb->paddr = g_gpu->fb.pa;
-        fb->bytes = g_gpu->fb.bytes;
-        fb->stride = g_gpu->fb.stride;
-        fb->format = g_gpu->format;
-        fb->width = g_gpu->width;
-        fb->height = g_gpu->height;
-        *nbytes_out = sizeof(*fb);
-        return EOK;
-    }
-    case DCMD_TOILE_GPU_PRESENT: {
-        toile_gpu_rect_t r;
-        memset(&r, 0, sizeof(r));
-        if (msg->i.nbytes == sizeof(r))
-            memcpy(&r, payload, sizeof(r));
-        toile_rect rect = {r.x, r.y, r.w, r.h};
-        int rc = gpu_present(g_gpu, rect);
-        return rc == TOILE_OK ? EOK : EIO;
-    }
+        return gpu_devctl_info(g_gpu, payload, nbytes_out);
+    case DCMD_TOILE_GPU_FB:
+        return gpu_devctl_fb(g_gpu, payload, nbytes_out);
+    case DCMD_TOILE_GPU_PRESENT:
+        return gpu_devctl_present(g_gpu, msg);
+    case DCMD_TOILE_GPU_ANIM_GET:
+        return gpu_devctl_anim_get(payload, nbytes_out);
+    case DCMD_TOILE_GPU_ANIM_SET:
+        return gpu_devctl_anim_set(payload, msg->i.nbytes);
     case DCMD_TOILE_GPU_MIRE:
-        gpu_paint_mire(&g_gpu->fb, g_gpu->width, g_gpu->height,
-                       g_gpu->format);
-        (void)gpu_present(g_gpu, (toile_rect){0u, 0u, 0u, 0u});
-        gpu_readback_probe(g_gpu);
-        *(uint32_t *)payload = 0u;
-        *nbytes_out = sizeof(uint32_t);
-        return EOK;
+        return gpu_devctl_mire(g_gpu, payload, nbytes_out);
     default:
         return ENOSYS;
     }

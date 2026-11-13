@@ -149,7 +149,8 @@ $(DISPLAY_BIN): $(BUILD)/display/toile_display.o $(BUILD)/display/toile_dispskel
 	@mkdir -p $(dir $@)
 	$(CC) -V $(TOILE_VARIANT) $^ -lscreen -o $@
 
-$(INPUT_BIN): $(BUILD)/input/toile_input.o $(VIRTIO_OBJS) $(PGW_OBJS)
+$(INPUT_BIN): $(BUILD)/input/toile_input.o $(BUILD)/common/toile_gpu_client.o \
+              $(VIRTIO_OBJS) $(PGW_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) -V $(TOILE_VARIANT) $^ $(LDFLAGS) -o $@
 

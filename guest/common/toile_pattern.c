@@ -23,9 +23,15 @@ int toile_pattern_fmt_is_bgra(uint32_t fmt)
 
 uint32_t toile_pattern_pack(uint32_t fmt, uint32_t r, uint32_t g, uint32_t b)
 {
+    uint32_t word;
+    r &= 0xFFu; /* X stays 0: the packed word is 24 bits of colour only, */
+    g &= 0xFFu; /* so the guest hash and the host pixels agree byte-wise. */
+    b &= 0xFFu;
     if (toile_pattern_fmt_is_bgra(fmt))
-        return (r << 16) | (g << 8) | b; /* word bytes: B,G,R,X on LE */
-    return (b << 16) | (g << 8) | r;     /* word bytes: R,G,B,X on LE */
+        word = (r << 16) | (g << 8) | b; /* word bytes: B,G,R,X on LE */
+    else
+        word = (b << 16) | (g << 8) | r; /* word bytes: R,G,B,X on LE */
+    return word & 0x00FFFFFFu;
 }
 
 static const uint32_t pattern_bar_rgb[PATTERN_BARS][3] = {
