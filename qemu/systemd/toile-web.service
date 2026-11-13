@@ -16,6 +16,9 @@ Environment=QNX_EMS_SERIE=/home/baptiste/Bureau/toile-demo/serial.log
 Environment=QNX_EMS_MON=/home/baptiste/Bureau/toile-demo/mon.sock
 Environment=QNX_EMS_PPM=/home/baptiste/Bureau/toile-demo/web-vga.ppm
 Environment=QNX_EMS_PORT=8111
+# La vitrine est servie sous un chemin par le funnel tailscale :
+# les URLs de la page doivent porter ce prefixe.
+Environment=QNX_EMS_BASE=/toile
 Environment=QNX_EMS_TITRE=Toile sur QNX 8.0
 Environment=QNX_EMS_NOTE=invité QNX 8.0 (QEMU) — le pilote Toile peint par virtio-gpu
 ExecStart=/usr/bin/python3 %h/Bureau/qnx-emu/web.py
