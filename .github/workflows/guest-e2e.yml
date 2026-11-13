@@ -56,9 +56,21 @@ jobs:
           # Le runner est un service systemd utilisateur : son PATH ne contient
           # pas toujours /usr/bin. On le fixe explicitement plutot que de
           # dependre de l'environnement du runner.
-          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-          command -v qemu-system-x86_64 >/dev/null || { echo "::error::qemu-system-x86_64 absent du runner"; exit 1; }
+          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/home/baptiste/bin:$PATH"
           command -v python3 >/dev/null || { echo "::error::python3 absent du runner"; exit 1; }
+          # QEMU n'est pas toujours dans le PATH du runner : certains l'ont
+          # en build portable dans ~/bin, sans lien dans /usr/bin.
+          QEMU=""
+          for c in "$(command -v qemu-system-x86_64 || true)" \
+                   /usr/bin/qemu-system-x86_64 \
+                   /home/baptiste/bin/qemu-system-x86_64 \
+                   /home/baptiste/qemu-portable/bin/qemu-system-x86_64; do
+            [ -x "$c" ] && QEMU="$c" && break
+          done
+          [ -n "$QEMU" ] || { echo "::error::qemu-system-x86_64 introuvable sur le runner"; exit 1; }
+          echo "TOILE_QEMU=$QEMU" >> "$GITHUB_ENV"
+          echo "qemu : $QEMU"
+          "$QEMU" --version | head -1
           if [ ! -w /dev/kvm ]; then
             echo "::error::le runner n'a pas /dev/kvm : l invite ne bootera pas dans le budget de 5 min"
             exit 1
@@ -85,7 +97,7 @@ jobs:
         if: steps.ifs.outputs.ifs_path != ''
         run: |
           set -euo pipefail
-          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/home/baptiste/bin:$PATH"
           chmod +x qemu/verify-hash.sh
           ./qemu/verify-hash.sh --ifs "${{ steps.ifs.outputs.ifs_path }}" --vnc 20
 
