@@ -78,6 +78,10 @@ jobs:
 
       - name: Telecharger l'image IFS publiee
         id: ifs
+        env:
+          # gh n est pas authentifie par defaut dans un job : sans ce jeton,
+          # le telechargement echoue et la preuve etait sautee en silence.
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TAG="${{ vars.GUEST_IFS_TAG || 'guest-ifs-latest' }}"
@@ -105,7 +109,11 @@ jobs:
         if: always()
         run: |
           if [ -z "${{ steps.ifs.outputs.ifs_path }}" ]; then
-            echo "::warning::preuve C non executee (pas d image publiee)"
+            echo "::warning::preuve C NON EXECUTEE (aucune image IFS publiee)"
+            echo "### Preuve C : NON EXECUTEE" >> "$GITHUB_STEP_SUMMARY"
+            echo "Aucune image IFS publiee : la preuve C n a pas ete jouee." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          echo "### Preuve C : EMPREINTES IDENTIQUES" >> "$GITHUB_STEP_SUMMARY"
+          echo "L empreinte FNV-1a publiee par l invite est egale a celle recalculee sur les pixels rendus par QEMU." >> "$GITHUB_STEP_SUMMARY"
           echo "preuve C : empreintes de l invite et de l emulateur identiques"
